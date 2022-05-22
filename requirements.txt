@@ -1,0 +1,2 @@
+environs==9.3.*
+discord.py==1.6.*

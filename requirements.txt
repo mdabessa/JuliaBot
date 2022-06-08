@@ -1,2 +1,4 @@
-environs==9.3.*
 discord.py==1.6.*
+environs==9.3.*
+psycopg2-binary==2.9.*
+SQLAlchemy==1.4.*

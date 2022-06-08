@@ -1,6 +1,3 @@
-from sys import path
-
-path.insert(0, "/src")
 from environs import Env
 from os import environ
 

@@ -34,6 +34,26 @@ class Core(commands.Cog):
     async def prefix(self, ctx: commands.Context):
         await self._prefix(ctx.message)
 
+    
+    @commands.cooldown(1, 10, commands.BucketType.member)
+    @commands.command(
+        name='say',
+        brief='Fazer o bot dizer algo.',
+        aliases=['diga']
+    )
+    async def say(self, ctx: commands.Context, *, content: str):
+        await ctx.send(content)
+
+    
+    @commands.has_permissions(administrator=True)    
+    @commands.command(
+        name='upchat',
+        brief='Suba o chat do canal.',
+        aliases=['subirchat', 'uc']
+    )
+    async def up_chat(self, ctx: commands.Context):
+        await ctx.send('** **\n'*50)
+
 
     @commands.Cog.listener()
     async def on_message(self, message: Message):

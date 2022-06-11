@@ -9,6 +9,8 @@ class Client(Bot):
     def __init__(self,**options) -> None:
         super().__init__(**options)
 
+        self.color = 0xE6DC56
+
         init_db()
 
         cogs = [file.stem for file in Path('juliabot', 'cogs').glob('*.py')]

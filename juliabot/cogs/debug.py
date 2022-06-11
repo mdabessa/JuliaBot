@@ -19,12 +19,13 @@ class Debug(commands.Cog):
         hidden=True,
         )
     async def reload_cogs(self, ctx: commands.Context):
+        msg = await ctx.send('Recarregando cogs...')
         exts = self.bot.extensions.copy()
         for ext in exts:
-            await ctx.send(f'Recarregando {ext}...')
+            await msg.edit(content=f'Recarregando {ext}...')
             self.bot.reload_extension(ext)
-            await ctx.send(f'{ext} recarregada com sucesso!')
 
+        await msg.edit(content='Cogs regarregados com sucesso!')
 
 
 def setup(bot: commands.Bot):

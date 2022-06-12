@@ -1,6 +1,6 @@
-from time import time
-
 from discord.ext import commands
+
+from ..scripts import Script
 
 
 class Debug(commands.Cog):
@@ -16,7 +16,6 @@ class Debug(commands.Cog):
         name='reload',
         brief='Recarregar commandos.',
         description='Recarrega todos os cogs do bot.',
-        hidden=True,
         )
     async def reload_cogs(self, ctx: commands.Context):
         msg = await ctx.send('Recarregando cogs...')
@@ -27,6 +26,19 @@ class Debug(commands.Cog):
 
         await msg.edit(content='Cogs regarregados com sucesso!')
 
+
+    @commands.command(
+        name='scripts',
+        brief='Listar todos os scripts rodando.',
+        aliases=["get_scripts"]
+    )
+    async def get_all_scripts(self, ctx: commands.Context):
+        scripts = Script.get_scripts()
+        if scripts:
+            for script in scripts:
+                await ctx.send(f'```Nome: {script.name}\nCache:{script.cache}```')
+        else:
+            await ctx.send('Nenhum script rodando no momento.')
 
 def setup(bot: commands.Bot):
     bot.add_cog(Debug(bot))

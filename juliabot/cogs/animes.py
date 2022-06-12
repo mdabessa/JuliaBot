@@ -32,7 +32,6 @@ class Character(commands.Converter):
         return char
 
 
-
 class Animes(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from sqlalchemy import Column, String, create_engine
+from datetime import datetime
+from typing import List
+from sqlalchemy import Column, String, Integer, DateTime, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.sql import func
 
 from .config import DATABASE_URL
 
@@ -77,6 +80,29 @@ class Server(Model):
         
         return server
 
+
+class Reminder(Model):
+    __tablename__ = 'reminder'
+
+    id = Column(Integer, primary_key=True)
+    channel_id = Column(String, nullable=False)
+    message_id = Column(String, nullable=False)
+    user_id = Column(String, nullable=False)
+    time_created  = Column(DateTime(timezone=True), server_default=func.now())
+    time_reminder = Column(DateTime, nullable=False)
+
+
+    def __init__(self, channel_id: str, message_id: str, user_id: str, time_reminder: datetime) -> None:
+        super().__init__(
+            channel_id=channel_id,
+            message_id=message_id,
+            user_id=user_id,
+            time_reminder=time_reminder
+        )
+
+    @classmethod
+    def get_expired(cls) -> List[Reminder]:
+        return session.query(cls).filter(cls.time_reminder <= datetime.now()).all()
 
 
 def init_db():

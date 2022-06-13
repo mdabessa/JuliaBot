@@ -26,9 +26,9 @@ class Client(Bot):
         print("Pronto!")
 
 
-    async def on_message(self, ctx: Message):
-        print(f"{ctx.guild} #{ctx.channel} //{ctx.author} : {ctx.content}")
-        await self.process_commands(ctx)
+    async def on_message(self, message: Message):
+        print(f"{message.guild} #{message.channel} //{message.author} : {message.content}")
+        await self.process_commands(message)
 
 
 

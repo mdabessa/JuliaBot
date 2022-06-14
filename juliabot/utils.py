@@ -9,4 +9,4 @@ def get_prefix(bot: Bot, message: Message) -> str:
         server = Server.get_or_create(str(message.guild.id))
         return server.prefix
     else:
-        return 'j!'
+        return "j!"

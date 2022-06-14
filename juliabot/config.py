@@ -7,5 +7,3 @@ env.read_env()
 
 DATABASE_URL = environ["DATABASE_URL"]
 DISCORD_TOKEN = environ["DISCORD_TOKEN"]
-
-

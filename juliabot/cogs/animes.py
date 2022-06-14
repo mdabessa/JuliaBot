@@ -3,16 +3,15 @@ from discord.ext import commands
 import jikanpy as jk
 
 
-
 class Anime(commands.Converter):
     async def convert(self, ctx: commands.Context, argument: str) -> dict | None:
-        msg = await ctx.send(f'Procurando anime: `{argument}`...')
+        msg = await ctx.send(f"Procurando anime: `{argument}`...")
         jikan = jk.Jikan()
         try:
-            anime = jikan.search('anime', argument)['results'][0]
+            anime = jikan.search("anime", argument)["results"][0]
         except:
             anime = None
-        
+
         await msg.delete()
 
         return anime
@@ -20,13 +19,13 @@ class Anime(commands.Converter):
 
 class Character(commands.Converter):
     async def convert(self, ctx: commands.Context, argument: str) -> dict | None:
-        msg = await ctx.send(f'Procurando char: `{argument}`...')
+        msg = await ctx.send(f"Procurando char: `{argument}`...")
         jikan = jk.Jikan()
         try:
-            char = jikan.search('character', argument)['results'][0]
+            char = jikan.search("character", argument)["results"][0]
         except:
             char = None
-        
+
         await msg.delete()
 
         return char
@@ -36,25 +35,30 @@ class Animes(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-
     @commands.cooldown(1, 4, commands.BucketType.user)
     @commands.command(
-        name='anime_info',
-        brief='Retornar informações sobre um anime.',
-        aliases=['anime', 'ai']
+        name="anime_info",
+        brief="Retornar informações sobre um anime.",
+        aliases=["anime", "ai"],
     )
     async def anime_info(self, ctx: commands.Context, *, anime: Anime):
         if anime:
             emb = Embed(
-                title=anime["title"], description=anime["synopsis"], color=self.bot.color
+                title=anime["title"],
+                description=anime["synopsis"],
+                color=self.bot.color,
             )
             emb.set_thumbnail(url=anime["image_url"])
 
             emb.add_field(name="Episódios:", value=anime["episodes"], inline=False)
-            emb.add_field(name="Score (MyAnimeList):", value=anime["score"], inline=False)
+            emb.add_field(
+                name="Score (MyAnimeList):", value=anime["score"], inline=False
+            )
             emb.add_field(name="Tipo:", value=anime["type"], inline=False)
             emb.add_field(
-                name="Lançando:", value="Sim" if anime["airing"] else "Não", inline=False
+                name="Lançando:",
+                value="Sim" if anime["airing"] else "Não",
+                inline=False,
             )
             emb.add_field(
                 name="Link:", value=f'[MyAnimeList]({anime["url"]})', inline=False
@@ -63,14 +67,13 @@ class Animes(commands.Cog):
             await ctx.send(embed=emb)
 
         else:
-            await ctx.send('Não consegui achar nenhum anime com esse nome. 🙁')
-
+            await ctx.send("Não consegui achar nenhum anime com esse nome. 🙁")
 
     @commands.cooldown(1, 4, commands.BucketType.user)
     @commands.command(
-        name='char_info',
-        brief='Retornar informações sobre um personagem.',
-        aliases=['char', 'ci', 'personagem']
+        name="char_info",
+        brief="Retornar informações sobre um personagem.",
+        aliases=["char", "ci", "personagem"],
     )
     async def char_info(self, ctx: commands.Context, *, char: Character):
         if char:
@@ -110,8 +113,7 @@ class Animes(commands.Cog):
             await ctx.send(embed=emb)
 
         else:
-            await ctx.send('Não consegui achar nenhum personagem com esse nome. 🙁')
-
+            await ctx.send("Não consegui achar nenhum personagem com esse nome. 🙁")
 
 
 def setup(bot: commands.Bot):

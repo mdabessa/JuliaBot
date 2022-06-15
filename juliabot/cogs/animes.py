@@ -1,34 +1,6 @@
 from discord import Embed
 from discord.ext import commands
-import jikanpy as jk
-
-
-class Anime(commands.Converter):
-    async def convert(self, ctx: commands.Context, argument: str) -> dict | None:
-        msg = await ctx.send(f"Procurando anime: `{argument}`...")
-        jikan = jk.Jikan()
-        try:
-            anime = jikan.search("anime", argument)["results"][0]
-        except:
-            anime = None
-
-        await msg.delete()
-
-        return anime
-
-
-class Character(commands.Converter):
-    async def convert(self, ctx: commands.Context, argument: str) -> dict | None:
-        msg = await ctx.send(f"Procurando char: `{argument}`...")
-        jikan = jk.Jikan()
-        try:
-            char = jikan.search("character", argument)["results"][0]
-        except:
-            char = None
-
-        await msg.delete()
-
-        return char
+from ..converters import Anime, Character
 
 
 class Animes(commands.Cog):

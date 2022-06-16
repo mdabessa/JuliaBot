@@ -3,7 +3,6 @@ import jikanpy as jk
 import datetime
 
 
-
 class Anime(commands.Converter):
     async def convert(self, ctx: commands.Context, argument: str) -> dict | None:
         msg = await ctx.send(f"Procurando anime: `{argument}`...")
@@ -117,4 +116,3 @@ class DeltaToDate(commands.Converter):
             )
 
         return datetime.datetime.now() + delta
-

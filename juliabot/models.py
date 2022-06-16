@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import List
-from sqlalchemy import Column, String, Integer, DateTime, Boolean, create_engine
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, and_, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
@@ -56,6 +56,7 @@ class Server(Model):
 
     server_id = Column(String, primary_key=True)
     prefix = Column(String, default="j!")
+    anime_channel = Column(String)
 
     def __init__(self, server_id: str) -> None:
         super().__init__(server_id=server_id)
@@ -65,6 +66,10 @@ class Server(Model):
             raise "Prefix can not be empty"
 
         self.prefix = prefix
+        self.update()
+
+    def set_anime_channel(self, channel_id: str):
+        self.anime_channel = channel_id
         self.update()
 
     @classmethod
@@ -104,6 +109,69 @@ class Reminder(Model):
     @classmethod
     def get_expired(cls) -> List[Reminder]:
         return session.query(cls).filter(cls.time_reminder <= datetime.now()).all()
+
+
+class AnimesNotifier(Model):
+    __tablename__ = "animes_notifier"
+
+    # My Anime List ID
+    mal_id = Column(Integer, primary_key=True)
+    episode = Column(Integer, primary_key=True)
+    dubbed = Column(Boolean, primary_key=True, default=False)
+    name = Column(String, nullable=False)
+    image = Column(String, nullable=False)
+    url = Column(String, nullable=False)
+    site = Column(String, nullable=False)
+    notified = Column(Boolean, nullable=False, default=False)
+
+    def __init__(
+        self,
+        mal_id: int,
+        episode: int,
+        name: str,
+        image: str,
+        url: str,
+        site: str,
+        dubbed: bool = False,
+    ) -> None:
+        super().__init__(
+            mal_id=mal_id,
+            episode=episode,
+            name=name,
+            image=image,
+            url=url,
+            site=site,
+            dubbed=dubbed,
+        )
+
+        self.keep_limit()
+
+    def set_notified(self, notified: bool):
+        self.notified = notified
+        self.update()
+
+    @classmethod
+    def get_not_notified(cls) -> List[AnimesNotifier]:
+        return session.query(cls).filter(cls.notified == False).all()
+
+    @classmethod
+    def get(cls, mal_id: int, episode: int, dubbed: bool) -> AnimesNotifier | None:
+        return (
+            session.query(cls)
+            .filter(
+                and_(cls.mal_id == mal_id, cls.episode == episode, cls.dubbed == dubbed)
+            )
+            .first()
+        )
+
+    @classmethod
+    def keep_limit(cls):
+        LIM = 1000
+        rows = cls.select_all()
+
+        if len(rows) > LIM:
+            for i in range(len(rows) - LIM):
+                rows[i].delete()
 
 
 def init_db():

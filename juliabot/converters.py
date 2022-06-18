@@ -6,11 +6,14 @@ import datetime
 class Anime(commands.Converter):
     async def convert(self, ctx: commands.Context, argument: str) -> dict | None:
         msg = await ctx.send(f"Procurando anime: `{argument}`...")
+
+        dubbed = "dublado" in argument.lower()
+        anime_name = argument.replace("dublado", "")
+
         jikan = jk.Jikan()
-        try:
-            anime = jikan.search("anime", argument)["results"][0]
-        except:
-            anime = None
+        anime = jikan.search("anime", anime_name)["results"][0]
+
+        anime["dubbed"] = dubbed
 
         await msg.delete()
 

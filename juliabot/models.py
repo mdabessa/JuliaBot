@@ -174,5 +174,38 @@ class AnimesNotifier(Model):
                 rows[i].delete()
 
 
+class AnimesList(Model):
+    __tablename__ = "anime_list"
+
+    user_id = Column(String, primary_key=True)
+    mal_id = Column(Integer, primary_key=True)
+    dubbed = Column(Boolean, primary_key=True, default=False)
+
+    def __init__(self, user_id: str, mal_id: str, dubbed: bool = False) -> None:
+        super().__init__(user_id=user_id, mal_id=mal_id, dubbed=dubbed)
+
+    @classmethod
+    def get(cls, user_id: str, mal_id: int, dubbed: bool) -> AnimesList | None:
+        return (
+            session.query(cls)
+            .filter(
+                and_(cls.user_id == user_id, cls.mal_id == mal_id, cls.dubbed == dubbed)
+            )
+            .first()
+        )
+
+    @classmethod
+    def get_user(cls, user_id: str) -> List[AnimesList]:
+        return session.query(cls).filter(cls.user_id == user_id).all()
+
+    @classmethod
+    def get_anime(cls, mal_id: int, dubbed: bool = False) -> List[AnimesList]:
+        return (
+            session.query(cls)
+            .filter(and_(cls.mal_id == mal_id, cls.dubbed == dubbed))
+            .all()
+        )
+
+
 def init_db():
     Model.metadata.create_all(engine)

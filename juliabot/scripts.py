@@ -19,7 +19,7 @@ class Script:
 
         scripts = self.__class__.fetch_script(name, by="refname")
         if len(scripts) >= func["limit_by_name"]:
-            raise Exception(f'Scripts com o nome "{name}", não podem ser mais criados.')
+            scripts[0].close()
 
         self.name = name + "_ind" + str(self.__class__.index)
         self.refname = name
@@ -117,7 +117,7 @@ class Script:
 
     @classmethod
     def get_scripts(cls) -> List[Script]:
-        return cls.scripts
+        return cls.scripts.copy()
 
     @classmethod
     def add_script(cls, script: Script):

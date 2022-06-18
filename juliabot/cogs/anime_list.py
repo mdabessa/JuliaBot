@@ -1,14 +1,13 @@
 from asyncio import sleep
-from email import message
 from typing import Optional
 
 from discord import Embed, TextChannel, User
 from discord.ext import commands, tasks
-from jikanpy import Jikan
 
-from ..models import AnimesNotifier, Server, AnimesList
 from ..converters import Anime
+from ..models import AnimesNotifier, Server, AnimesList
 from ..scripts import Script
+from ..utils import get_anime
 
 
 class AnimeList(commands.Cog):
@@ -35,9 +34,8 @@ class AnimeList(commands.Cog):
             await message.add_reaction("➡️")
             await message.add_reaction("❌")
 
-            jikan = Jikan()
             for i, _anime in enumerate(animes_db):
-                anime = jikan.anime(_anime.mal_id)
+                anime = await get_anime(_anime.mal_id)
                 animes_jk.append(anime)
 
                 if len(animes_jk) > 0:

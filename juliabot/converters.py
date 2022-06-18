@@ -1,6 +1,7 @@
 from discord.ext import commands
-import jikanpy as jk
 import datetime
+
+from .utils import search_anime
 
 
 class Anime(commands.Converter):
@@ -10,9 +11,9 @@ class Anime(commands.Converter):
         dubbed = "dublado" in argument.lower()
         anime_name = argument.replace("dublado", "")
 
-        jikan = jk.Jikan()
-        anime = jikan.search("anime", anime_name)["results"][0]
+        search = await search_anime("anime", anime_name)
 
+        anime = search["results"][0]
         anime["dubbed"] = dubbed
 
         await msg.delete()
@@ -23,11 +24,9 @@ class Anime(commands.Converter):
 class Character(commands.Converter):
     async def convert(self, ctx: commands.Context, argument: str) -> dict | None:
         msg = await ctx.send(f"Procurando char: `{argument}`...")
-        jikan = jk.Jikan()
-        try:
-            char = jikan.search("character", argument)["results"][0]
-        except:
-            char = None
+
+        search = await search_anime("character", argument)
+        char = search["results"][0]
 
         await msg.delete()
 

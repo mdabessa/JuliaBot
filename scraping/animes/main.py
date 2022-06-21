@@ -23,7 +23,11 @@ def main():
     dir_path = os.path.dirname(os.path.realpath(__file__))
     files = os.listdir(os.path.join(dir_path))
 
-    files = [f.replace(".py", "") for f in files if f.endswith(".py") and f.startswith('site_')]
+    files = [
+        f.replace(".py", "")
+        for f in files
+        if f.endswith(".py") and f.startswith("site_")
+    ]
 
     episodes = []
     for file in files:

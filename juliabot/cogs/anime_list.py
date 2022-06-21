@@ -10,7 +10,11 @@ from ..scripts import Script
 from ..utils import get_anime
 
 
-class AnimeList(commands.Cog):
+class AnimeList(commands.Cog, name="animelist"):
+    """Categoria relacionada a notificação e lista de animes."""
+
+    embed_title = ":japanese_ogre:AnimeList."
+
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
@@ -303,7 +307,9 @@ class AnimeList(commands.Cog):
 
     @commands.guild_only()
     @commands.command(
-        brief="Retorna o canal de notificações de animes do servidor", aliases=["ac"]
+        brief="Canal de notificações de animes.",
+        help="Retorna o canal de notificações de animes do servidor.",
+        aliases=["ac"],
     )
     async def anime_channel(self, ctx: commands.Context):
         server = Server.get(str(ctx.guild.id))
@@ -328,7 +334,9 @@ class AnimeList(commands.Cog):
     @commands.has_permissions(administrator=True)
     @commands.guild_only()
     @commands.command(
-        brief="Configure o canal de notificações de animes", aliases=["sac"]
+        brief="Configure o canal de notificações de animes.",
+        aliases=["sac"],
+        help="Define o canal de notificações de novos episódios de animes.",
     )
     async def set_anime_channel(
         self, ctx: commands.Context, channel: Optional[TextChannel] = None
@@ -344,7 +352,8 @@ class AnimeList(commands.Cog):
         await ctx.send(f"Canal de notificações de anime configurado para: `{channel}`")
 
     @commands.command(
-        brief="Adicione um anime a sua lista, para você ser notificado quando lançar episódio novo.",
+        brief="Adicione um anime a sua lista.",
+        help="Adicione um anime a sua lista, para você ser notificado quando lançar episódio novo.",
         aliases=["aa"],
     )
     async def add_anime(self, ctx: commands.Context, *, anime: Anime):

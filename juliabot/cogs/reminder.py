@@ -6,7 +6,11 @@ from ..models import Reminder
 from ..converters import Date, DeltaToDate
 
 
-class _Reminder(commands.Cog, name="Reminder"):
+class _Reminder(commands.Cog, name="reminder"):
+    """Categoria relacionada a comandos de lembrete."""
+
+    embed_title = ":alarm_clock:Reminder."
+
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 

@@ -73,7 +73,7 @@ class Server(Model):
         self.update()
 
     @classmethod
-    def get(cls, server_id: str) -> Server:
+    def get(cls, server_id: str) -> Server | None:
         return cls.select_one(key="server_id", value=server_id)
 
     @classmethod

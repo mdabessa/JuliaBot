@@ -7,7 +7,11 @@ from discord import Message, User, Reaction
 from ..scripts import Script
 
 
-class Core(commands.Cog):
+class Core(commands.Cog, name="core"):
+    """Categoria relacionada a comandos e funções cores do bot."""
+
+    embed_title = ":brain:Core."
+
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 

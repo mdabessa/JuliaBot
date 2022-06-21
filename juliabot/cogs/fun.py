@@ -6,7 +6,11 @@ from random import randint
 from ..scripts import Script
 
 
-class Fun(commands.Cog):
+class Fun(commands.Cog, name="fun"):
+    """Categoria relacionada a comandos de diversão."""
+
+    embed_title = ":game_die:Diversão."
+
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 

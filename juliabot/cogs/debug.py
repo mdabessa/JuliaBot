@@ -4,6 +4,10 @@ from ..scripts import Script
 
 
 class Debug(commands.Cog):
+    """Debug"""
+
+    embed_title = "debug"
+
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 

@@ -3,7 +3,11 @@ from discord.ext import commands
 from ..converters import Anime, Character
 
 
-class Animes(commands.Cog):
+class Animes(commands.Cog, name="animes"):
+    """Categoria relacionado a comandos e de animes em geral."""
+
+    embed_title = ":japanese_goblin:Animes."
+
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 

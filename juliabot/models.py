@@ -59,29 +59,29 @@ class Server(Model):
     anime_channel = Column(String)
 
     def __init__(self, server_id: str) -> None:
-        super().__init__(server_id=server_id)
+        super().__init__(server_id=str(server_id))
 
     def set_prefix(self, prefix: str) -> None:
         if not prefix:
             raise "Prefix can not be empty"
 
-        self.prefix = prefix
+        self.prefix = str(prefix)
         self.update()
 
     def set_anime_channel(self, channel_id: str):
-        self.anime_channel = channel_id
+        self.anime_channel = str(channel_id)
         self.update()
 
     @classmethod
     def get(cls, server_id: str) -> Server | None:
-        return cls.select_one(key="server_id", value=server_id)
+        return cls.select_one(key="server_id", value=str(server_id))
 
     @classmethod
     def get_or_create(cls, server_id: str) -> Server:
         # Query a discord server in the database, if it doesn't exist insert a new one into it.
-        server = cls.get(server_id)
+        server = cls.get(str(server_id))
         if not server:
-            server = Server(server_id)
+            server = Server(str(server_id))
 
         return server
 
@@ -100,9 +100,9 @@ class Reminder(Model):
         self, channel_id: str, message_id: str, user_id: str, time_reminder: datetime
     ) -> None:
         super().__init__(
-            channel_id=channel_id,
-            message_id=message_id,
-            user_id=user_id,
+            channel_id=str(channel_id),
+            message_id=str(message_id),
+            user_id=str(user_id),
             time_reminder=time_reminder,
         )
 
@@ -135,19 +135,19 @@ class AnimesNotifier(Model):
         dubbed: bool = False,
     ) -> None:
         super().__init__(
-            mal_id=mal_id,
-            episode=episode,
-            name=name,
-            image=image,
-            url=url,
-            site=site,
-            dubbed=dubbed,
+            mal_id=int(mal_id),
+            episode=int(episode),
+            name=str(name),
+            image=str(image),
+            url=str(url),
+            site=str(site),
+            dubbed=bool(dubbed),
         )
 
         self.keep_limit()
 
     def set_notified(self, notified: bool):
-        self.notified = notified
+        self.notified = bool(notified)
         self.update()
 
     @classmethod
@@ -159,7 +159,7 @@ class AnimesNotifier(Model):
         return (
             session.query(cls)
             .filter(
-                and_(cls.mal_id == mal_id, cls.episode == episode, cls.dubbed == dubbed)
+                and_(cls.mal_id == int(mal_id), cls.episode == int(episode), cls.dubbed == bool(dubbed))
             )
             .first()
         )
@@ -182,27 +182,27 @@ class AnimesList(Model):
     dubbed = Column(Boolean, primary_key=True, default=False)
 
     def __init__(self, user_id: str, mal_id: str, dubbed: bool = False) -> None:
-        super().__init__(user_id=user_id, mal_id=mal_id, dubbed=dubbed)
+        super().__init__(user_id=str(user_id), mal_id=int(mal_id), dubbed=bool(dubbed))
 
     @classmethod
     def get(cls, user_id: str, mal_id: int, dubbed: bool) -> AnimesList | None:
         return (
             session.query(cls)
             .filter(
-                and_(cls.user_id == user_id, cls.mal_id == mal_id, cls.dubbed == dubbed)
+                and_(cls.user_id == str(user_id), cls.mal_id == int(mal_id), cls.dubbed == bool(dubbed))
             )
             .first()
         )
 
     @classmethod
     def get_user(cls, user_id: str) -> List[AnimesList]:
-        return session.query(cls).filter(cls.user_id == user_id).all()
+        return session.query(cls).filter(cls.user_id == str(user_id)).all()
 
     @classmethod
     def get_anime(cls, mal_id: int, dubbed: bool = False) -> List[AnimesList]:
         return (
             session.query(cls)
-            .filter(and_(cls.mal_id == mal_id, cls.dubbed == dubbed))
+            .filter(and_(cls.mal_id == int(mal_id), cls.dubbed == bool(dubbed)))
             .all()
         )
 

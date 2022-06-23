@@ -416,8 +416,8 @@ class AnimeList(commands.Cog, name="animelist"):
 
                     await channel.send(embed=embed)
 
-            except Exception:
-                continue
+            except Exception as e:
+                print(e)
 
         for anime in animes:
             dub = " [Dublado]" if anime.dubbed else ""

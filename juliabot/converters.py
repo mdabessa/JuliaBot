@@ -63,6 +63,7 @@ class DeltaToDate(commands.Converter):
             "minute": ["m", "min", "minute", "minutes", "minuto", "minutos"],
             "hour": ["h", "hour", "hours", "hora", "horas", "hr", "hrs"],
             "day": ["d", "day", "days", "dia", "dias"],
+            "week": ["w", "week", "weeks", "semana", "semanas"],
             "mounth": ["mounth", "mounths", "mes", "meses", "mês"],
             "year": ["y", "year", "years", "a", "ano", "anos"],
         }
@@ -102,6 +103,8 @@ class DeltaToDate(commands.Converter):
                 time += num * 3600
             elif word in leg["day"]:
                 time += num * 86400
+            elif word in leg["week"]:
+                time += num * 604800
             elif word in leg["mounth"]:
                 time += num * 2592000
             elif word in leg["year"]:

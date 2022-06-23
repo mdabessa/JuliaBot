@@ -49,9 +49,9 @@ class _Reminder(commands.Cog, name="reminder"):
                 _reminder.delete()
 
             except:
-                user = await self.bot.get_user(int(_reminder.user_id))
+                user = await self.bot.fetch_user(int(_reminder.user_id))
                 if user:
-                    user.send(
+                    await user.send(
                         "Você criou um lembrete para hoje, mas não consegui recuperar a mensagem do lembrete para te marcar. :worried:"
                     )
 

@@ -110,7 +110,7 @@ class DeltaToDate(commands.Converter):
             elif word in leg["year"]:
                 time += num * 31536000
             else:
-                return None
+                raise Exception(f"Não é possivel converter {word} em tempo.")
 
         delta = datetime.timedelta(seconds=time)
 

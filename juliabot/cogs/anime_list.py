@@ -3,6 +3,7 @@ from typing import Optional
 
 from discord import Embed, TextChannel, User
 from discord.ext import commands, tasks
+from discord.errors import NotFound
 
 from ..converters import Anime
 from ..models import AnimesNotifier, Server, AnimesList
@@ -439,7 +440,7 @@ class AnimeList(commands.Cog, name="animelist"):
 
                     message = await _user.send(embed=embed)
                     await message.add_reaction("👍")
-                except:
+                except NotFound:
                     user.delete()
 
         for anime in animes:

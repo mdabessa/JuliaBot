@@ -1,3 +1,4 @@
+from typing import Optional
 from discord.ext import commands
 from discord import User
 from random import randint
@@ -62,6 +63,13 @@ class Fun(commands.Cog, name="fun"):
     async def duel(self, ctx: commands.Context, *, user: User):
         scr = Script(f"duel_{ctx.guild.id}", "duel")
         await scr.execute(message=ctx.message)
+
+    @commands.command(name="dice", brief="Role um dado.", aliases=["dado", "d"])
+    async def dice(self, ctx: commands.Context, sides: Optional[int] = 6):
+        result = randint(1, sides)
+        await ctx.send(
+            f":game_die: {ctx.author.mention} rolou um dado e tirou `{result}`! :game_die:"
+        )
 
 
 def setup(bot: commands.Bot):

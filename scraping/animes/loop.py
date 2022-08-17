@@ -5,5 +5,3 @@ from time import sleep
 while True:
     main()
     sleep(600)
-
-

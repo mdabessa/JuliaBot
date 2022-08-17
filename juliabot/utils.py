@@ -21,5 +21,3 @@ async def search_anime(search_type: str, query: str):
 async def get_anime(id: int):
     async with AioJikan() as aio_jikan:
         return await aio_jikan.anime(id)
-
-

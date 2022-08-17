@@ -159,7 +159,11 @@ class AnimesNotifier(Model):
         return (
             session.query(cls)
             .filter(
-                and_(cls.mal_id == int(mal_id), cls.episode == int(episode), cls.dubbed == bool(dubbed))
+                and_(
+                    cls.mal_id == int(mal_id),
+                    cls.episode == int(episode),
+                    cls.dubbed == bool(dubbed),
+                )
             )
             .first()
         )
@@ -189,7 +193,11 @@ class AnimesList(Model):
         return (
             session.query(cls)
             .filter(
-                and_(cls.user_id == str(user_id), cls.mal_id == int(mal_id), cls.dubbed == bool(dubbed))
+                and_(
+                    cls.user_id == str(user_id),
+                    cls.mal_id == int(mal_id),
+                    cls.dubbed == bool(dubbed),
+                )
             )
             .first()
         )
@@ -214,14 +222,11 @@ class RocketLeague(Model):
     ballchasing_token = Column(String)
 
     def __init__(self, user_id: str) -> None:
-        super().__init__(
-            user_id=str(user_id)
-        )
-    
+        super().__init__(user_id=str(user_id))
+
     def set_ballchasing_token(self, ballchasing_token: str):
         self.ballchasing_token = str(ballchasing_token)
-        self.update() 
-
+        self.update()
 
     @classmethod
     def get(cls, user_id: str) -> RocketLeague:

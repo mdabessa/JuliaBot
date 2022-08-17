@@ -28,5 +28,15 @@ RANKS = [
 
 
 def replay_analyzer(replay_id: str, token: str) -> requests.Response:
-    return requests.get(f'https://rl-analyzer.herokuapp.com/doubles/{replay_id}', headers={'Authorization': token})
+    return requests.get(
+        f"https://rl-analyzer.herokuapp.com/replay/{replay_id}",
+        headers={"Authorization": token},
+    )
 
+
+def query_replays(query: dict, token: str) -> requests.Response:
+    return requests.get(
+        "https://ballchasing.com/api/replays",
+        params=query,
+        headers={"Authorization": token},
+    )

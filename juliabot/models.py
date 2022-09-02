@@ -51,6 +51,30 @@ class Model(Base):
             i.delete()
 
 
+class User(Model):
+    __tablename__ = "users"
+
+    user_id = Column(String, primary_key=True)
+    anime_lang = Column(String, default="pt-br")
+
+    def __init__(self, user_id: str, anime_lang: str = "pt-br") -> None:
+        super().__init__(user_id=user_id, anime_lang=anime_lang)
+
+
+    def set_anime_lang(self, anime_lang: str) -> None:
+        self.anime_lang = anime_lang
+        self.update()
+
+    @classmethod
+    def get_or_create(cls, user_id: str) -> User:
+        user = cls.select_one("user_id", user_id)
+
+        if user is None:
+            user = cls(user_id)
+
+        return user
+
+
 class Server(Model):
     __tablename__ = "servers"
 
@@ -118,6 +142,7 @@ class AnimesNotifier(Model):
     mal_id = Column(Integer, primary_key=True)
     episode = Column(Integer, primary_key=True)
     dubbed = Column(Boolean, primary_key=True, default=False)
+    lang = Column(String, primary_key=True, default="pt-BR")
     name = Column(String, nullable=False)
     image = Column(String, nullable=False)
     url = Column(String, nullable=False)
@@ -133,6 +158,7 @@ class AnimesNotifier(Model):
         url: str,
         site: str,
         dubbed: bool = False,
+        lang: str = "pt-BR",
     ) -> None:
         super().__init__(
             mal_id=int(mal_id),
@@ -142,6 +168,7 @@ class AnimesNotifier(Model):
             url=str(url),
             site=str(site),
             dubbed=bool(dubbed),
+            lang=str(lang),
         )
 
         self.keep_limit()
@@ -155,7 +182,7 @@ class AnimesNotifier(Model):
         return session.query(cls).filter(cls.notified == False).all()
 
     @classmethod
-    def get(cls, mal_id: int, episode: int, dubbed: bool) -> AnimesNotifier | None:
+    def get(cls, mal_id: int, episode: int, dubbed: bool, lang: str) -> AnimesNotifier | None:
         return (
             session.query(cls)
             .filter(
@@ -163,6 +190,7 @@ class AnimesNotifier(Model):
                     cls.mal_id == int(mal_id),
                     cls.episode == int(episode),
                     cls.dubbed == bool(dubbed),
+                    cls.lang == str(lang),
                 )
             )
             .first()

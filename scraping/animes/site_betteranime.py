@@ -52,6 +52,7 @@ def scrap_animes() -> List[Dict]:
                 "url": link,
                 "dub": dub,
                 "site": "BetterAnime",
+                "lang": "pt-BR",
             }
 
             episodes.append(episode)

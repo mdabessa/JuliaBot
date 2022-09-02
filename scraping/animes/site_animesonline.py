@@ -40,7 +40,6 @@ def scrap_animes() -> List[Dict]:
 
     _episodes = div.findChildren("article", recursive=False)
     print(f"Articles eps: {len(_episodes)}")
-
     episodes = []
     for ep in _episodes:
         try:
@@ -68,6 +67,7 @@ def scrap_animes() -> List[Dict]:
                 "url": link,
                 "dub": dub,
                 "site": "AnimesOnline",
+                "lang": "pt-BR",
             }
 
             episodes.append(episode)

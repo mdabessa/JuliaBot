@@ -60,6 +60,7 @@ def scrap_animes() -> List[Dict]:
                 "url": link,
                 "dub": dub,
                 "site": "AnimesHouse",
+                "lang": "pt-BR",
             }
 
             episodes.append(episode)

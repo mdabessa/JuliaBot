@@ -6,7 +6,7 @@ from discord.ext import commands, tasks
 from discord.errors import NotFound
 
 from ..converters import Anime
-from ..models import AnimesNotifier, Server, AnimesList
+from ..models import AnimesNotifier, Server, AnimesList, User
 from ..scripts import Script
 from ..utils import get_anime
 
@@ -386,6 +386,20 @@ class AnimeList(commands.Cog, name="animelist"):
             else:
                 await ctx.send(f"A lista de {user.mention} esta vazia!")
 
+    @commands.command(
+        brief="Configure a linguagem dos animes que você quer ser notificado.",
+        aliases=["sal"],
+        )
+    async def set_anime_lang(self, ctx: commands.Context, *, lang: str):
+        if lang.lower() not in ["pt-br", "en-us", "pt-br/en-us"]:
+            await ctx.send("Linguagem inválida!")
+            return
+
+        user = User.get_or_create(str(ctx.author.id))
+        user.set_anime_lang(lang)
+        await ctx.send(f"Linguagem de animes configurada para: `{lang}`")
+
+
     @tasks.loop(minutes=1)
     async def anime_notifier(self):
         animes = AnimesNotifier.get_not_notified()
@@ -436,9 +450,15 @@ class AnimeList(commands.Cog, name="animelist"):
 
             for user in users:
                 try:
-                    _user = await self.bot.fetch_user(int(user.user_id))
+                    disc_user = await self.bot.fetch_user(int(user.user_id))
 
-                    message = await _user.send(embed=embed)
+                    _user = User.get_or_create(user.user_id)
+                    lang = _user.anime_lang
+
+                    if lang not in _user.anime_lang:
+                        continue
+
+                    message = await disc_user.send(embed=embed)
                     await message.add_reaction("👍")
                 except NotFound:
                     user.delete()

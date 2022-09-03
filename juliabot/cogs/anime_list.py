@@ -453,7 +453,7 @@ class AnimeList(commands.Cog, name="animelist"):
 
                     _user = User.get_or_create(user.user_id)
 
-                    if anime.lang not in _user.anime_lang:
+                    if anime.lang.lower() not in _user.anime_lang.lower():
                         continue
 
                     message = await disc_user.send(embed=embed)

@@ -47,7 +47,7 @@ def scrap_animes() -> List[Dict]:
                 "image": image,
                 "url": URL+href,
                 "dub": False,
-                "site": "BetterAnime",
+                "site": "AnimixPlay",
                 "lang": "en-US",
             }
 

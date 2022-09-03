@@ -389,7 +389,7 @@ class AnimeList(commands.Cog, name="animelist"):
     @commands.command(
         brief="Configure a linguagem dos animes que você quer ser notificado.",
         aliases=["sal"],
-        )
+    )
     async def set_anime_lang(self, ctx: commands.Context, *, lang: str):
         if lang.lower() not in ["pt-br", "en-us", "pt-br/en-us"]:
             await ctx.send("Linguagem inválida!")
@@ -398,7 +398,6 @@ class AnimeList(commands.Cog, name="animelist"):
         user = User.get_or_create(str(ctx.author.id))
         user.set_anime_lang(lang)
         await ctx.send(f"Linguagem de animes configurada para: `{lang}`")
-
 
     @tasks.loop(minutes=1)
     async def anime_notifier(self):

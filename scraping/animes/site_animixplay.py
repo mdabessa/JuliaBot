@@ -45,7 +45,7 @@ def scrap_animes() -> List[Dict]:
                 "anime": anime,
                 "episode": number,
                 "image": image,
-                "url": URL+href,
+                "url": URL + href,
                 "dub": False,
                 "site": "AnimixPlay",
                 "lang": "en-US",

@@ -43,7 +43,9 @@ def main():
             mal = get_anime(jikan, episode["anime"][:100])
             mal_id = mal["mal_id"]
 
-            anime = AnimesNotifier.get(mal_id, episode["episode"], episode["dub"], episode["lang"])
+            anime = AnimesNotifier.get(
+                mal_id, episode["episode"], episode["dub"], episode["lang"]
+            )
             if anime is not None:
                 print(episode["anime"], "its already in database.")
                 continue

@@ -60,7 +60,6 @@ class User(Model):
     def __init__(self, user_id: str, anime_lang: str = "pt-br") -> None:
         super().__init__(user_id=user_id, anime_lang=anime_lang)
 
-
     def set_anime_lang(self, anime_lang: str) -> None:
         self.anime_lang = anime_lang
         self.update()
@@ -182,7 +181,9 @@ class AnimesNotifier(Model):
         return session.query(cls).filter(cls.notified == False).all()
 
     @classmethod
-    def get(cls, mal_id: int, episode: int, dubbed: bool, lang: str) -> AnimesNotifier | None:
+    def get(
+        cls, mal_id: int, episode: int, dubbed: bool, lang: str
+    ) -> AnimesNotifier | None:
         return (
             session.query(cls)
             .filter(

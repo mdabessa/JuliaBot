@@ -3,6 +3,7 @@ import sys
 
 sys.path.insert(1, os.getcwd())
 
+import asyncio
 import importlib
 from time import sleep
 
@@ -11,15 +12,8 @@ import jikanpy as jk
 from juliabot.models import AnimesNotifier
 
 
-def get_anime(jikan: jk.Jikan, query: str) -> dict:
-    search_result = jikan.search("anime", query)
-    sleep(4)  # API Limit
 
-    r = search_result["results"][0]
-    return r
-
-
-def main():
+async def main():
     dir_path = os.path.dirname(os.path.realpath(__file__))
     files = os.listdir(os.path.join(dir_path))
 
@@ -36,38 +30,48 @@ def main():
         eps = mod.scrap_animes()
         episodes.extend(eps)
 
-    jikan = jk.Jikan()
-
     for episode in episodes:
         try:
-            mal = get_anime(jikan, episode["anime"][:100])
-            mal_id = mal["mal_id"]
-
-            anime = AnimesNotifier.get(
-                mal_id, episode["episode"], episode["dub"], episode["lang"]
-            )
-            if anime is not None:
-                print(episode["anime"], "its already in database.")
+            async with jk.AioJikan() as aio_jikan:
+                mal = await aio_jikan.search('anime', episode["anime"][:100])
+        
+        # 500 Internal Server Error
+        except jk.exceptions.APIException:
+            try:
+                jikan = jk.Jikan()
+                mal = jikan.search('anime', episode["anime"][:100])
+            except Exception as e:
+                print(e)
                 continue
 
-            AnimesNotifier(
-                mal_id=mal_id,
-                episode=episode["episode"],
-                name=episode["anime"],
-                image=episode["image"],
-                url=episode["url"],
-                site=episode["site"],
-                dubbed=episode["dub"],
-                lang=episode["lang"],
-            )
+        mal = mal["results"][0]
+        mal_id = mal["mal_id"]
 
-            print(
-                f'\t{episode["anime"]} Episode {episode["episode"]}, was added to database.'
-            )
+        anime = AnimesNotifier.get(
+            mal_id, episode["episode"], episode["dub"], episode["lang"]
+        )
 
-        except Exception:
-            pass
+        if anime is not None:
+            print(episode["anime"], "its already in database.")
+            continue
+
+        AnimesNotifier(
+            mal_id=mal_id,
+            episode=episode["episode"],
+            name=episode["anime"],
+            image=episode["image"],
+            url=episode["url"],
+            site=episode["site"],
+            dubbed=episode["dub"],
+            lang=episode["lang"],
+        )
+
+        print(
+            f'\t{episode["anime"]} Episode {episode["episode"]}, was added to database.'
+        )
+
+        await asyncio.sleep(4) # To avoid 429 error
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

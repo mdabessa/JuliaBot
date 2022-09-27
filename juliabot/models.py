@@ -7,8 +7,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 
-from .config import DATABASE_URL
-
+from .config import DATABASE_URL, PREFIX
 
 engine = create_engine(DATABASE_URL, echo=False)
 Session = sessionmaker(bind=engine)
@@ -78,7 +77,7 @@ class Server(Model):
     __tablename__ = "servers"
 
     server_id = Column(String, primary_key=True)
-    prefix = Column(String, default="j!")
+    prefix = Column(String, default=PREFIX)
     anime_channel = Column(String)
 
     def __init__(self, server_id: str) -> None:

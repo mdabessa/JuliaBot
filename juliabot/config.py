@@ -9,3 +9,9 @@ DATABASE_URL = environ["DATABASE_URL"]
 DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://")
 
 DISCORD_TOKEN = environ["DISCORD_TOKEN"]
+
+try:
+    PREFIX = environ["PREFIX"]
+
+except KeyError:
+    PREFIX = "!"

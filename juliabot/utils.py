@@ -3,6 +3,7 @@ from discord import Message
 from jikanpy import AioJikan
 
 from .models import Server
+from .config import PREFIX
 
 
 def get_prefix(bot: Bot, message: Message) -> str:
@@ -10,7 +11,7 @@ def get_prefix(bot: Bot, message: Message) -> str:
         server = Server.get_or_create(str(message.guild.id))
         return server.prefix
     else:
-        return "j!"
+        return PREFIX
 
 
 async def search_anime(search_type: str, query: str):

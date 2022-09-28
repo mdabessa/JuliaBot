@@ -1,5 +1,6 @@
 from environs import Env
 from os import environ
+import time
 
 
 env = Env()
@@ -18,3 +19,14 @@ try:
     PREFIX = environ["PREFIX"]
 except KeyError:
     PREFIX = "!"
+
+
+try:
+    TZ = environ["TZ"]
+except KeyError:
+    TZ = "UTC"
+
+try:
+    time.tzset()
+except AttributeError:
+    print("tzset() not available on Windows")

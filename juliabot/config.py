@@ -20,6 +20,10 @@ try:
 except KeyError:
     PREFIX = "!"
 
+try:
+    ANIME_SCRAP_TIME = int(environ["ANIME_SCRAP_TIME"])
+except KeyError:
+    ANIME_SCRAP_TIME = 3600
 
 try:
     TZ = environ["TZ"]

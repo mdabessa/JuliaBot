@@ -3,4 +3,4 @@ environs==9.3.*
 psycopg2-binary==2.9.*
 SQLAlchemy==1.4.*
 beautifulsoup4==4.9.*
-jikan4==0.0.1
+jikan4==0.0.*

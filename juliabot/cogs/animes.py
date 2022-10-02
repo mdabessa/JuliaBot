@@ -24,7 +24,7 @@ class Animes(commands.Cog, name="animes"):
                 description=anime["synopsis"],
                 color=self.bot.color,
             )
-            emb.set_thumbnail(url=anime["image_url"])
+            emb.set_thumbnail(url=anime["images"]['jpg']['image_url'])
 
             emb.add_field(name="Episódios:", value=anime["episodes"], inline=False)
             emb.add_field(

@@ -41,7 +41,7 @@ class AnimeList(commands.Cog, name="animelist"):
 
             for i, _anime in enumerate(animes_db):
                 anime = await get_anime(_anime.mal_id)
-                animes_jk.append(anime)
+                animes_jk.append(anime["data"])
 
                 if len(animes_jk) > 0:
                     index = cache["index"]
@@ -58,7 +58,7 @@ class AnimeList(commands.Cog, name="animelist"):
                     )
 
                     embed = Embed(title="Anime:", description=desc, color=ctx.bot.color)
-                    embed.set_thumbnail(url=anime["image_url"])
+                    embed.set_thumbnail(url=anime["images"]['jpg']["image_url"])
 
                     if i != len(animes_db) - 1:
                         embed.set_footer(
@@ -169,7 +169,7 @@ class AnimeList(commands.Cog, name="animelist"):
                 )
 
                 emb = Embed(title="Anime:", description=desc, color=ctx.bot.color)
-                emb.set_thumbnail(url=anime["image_url"])
+                emb.set_thumbnail(url=anime["images"]['jpg']["image_url"])
                 emb.set_footer(text=f"{index+1}/{len(animes_jk)} animes.")
 
                 await message.edit(embed=emb, content="")
@@ -198,7 +198,7 @@ class AnimeList(commands.Cog, name="animelist"):
                 color=ctx.bot.color,
             )
 
-            embed.set_thumbnail(url=anime["image_url"])
+            embed.set_thumbnail(url=anime["images"]['jpg']["image_url"])
 
             message = await ctx.send(embed=embed)
             await message.add_reaction("👍")
@@ -263,7 +263,7 @@ class AnimeList(commands.Cog, name="animelist"):
                 color=ctx.bot.color,
             )
 
-            embed.set_thumbnail(url=anime["image_url"])
+            embed.set_thumbnail(url=anime["images"]['jpg']["image_url"])
 
             message = await ctx.send(embed=embed)
             await message.add_reaction("👍")

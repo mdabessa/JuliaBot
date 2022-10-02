@@ -1,6 +1,6 @@
 from discord.ext.commands import Bot
 from discord import Message
-from jikanpy import AioJikan
+from jikan4.aiojikan import AioJikan
 
 from .models import Server
 from .config import PREFIX
@@ -16,9 +16,9 @@ def get_prefix(bot: Bot, message: Message) -> str:
 
 async def search_anime(search_type: str, query: str):
     async with AioJikan() as aio_jikan:
-        return await aio_jikan.search(search_type, query)
+        return await aio_jikan.search_anime(search_type, query)
 
 
 async def get_anime(id: int):
     async with AioJikan() as aio_jikan:
-        return await aio_jikan.anime(id)
+        return await aio_jikan.get_anime(id)

@@ -13,7 +13,11 @@ class Anime(commands.Converter):
 
         search = await search_anime("anime", anime_name)
 
-        anime = search["results"][0]
+        if not search["data"]:
+            return
+        
+        anime = search["data"][0]
+
         anime["dubbed"] = dubbed
 
         await msg.delete()

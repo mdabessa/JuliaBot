@@ -5,9 +5,8 @@ sys.path.insert(1, os.getcwd())
 
 import asyncio
 import importlib
-from time import sleep
 
-import jikanpy as jk
+from jikan4.aiojikan import AioJikan
 
 from juliabot.models import AnimesNotifier
 
@@ -31,20 +30,17 @@ async def main():
         episodes.extend(eps)
 
     for episode in episodes:
-        try:
-            async with jk.AioJikan() as aio_jikan:
-                mal = await aio_jikan.search('anime', episode["anime"][:100])
-        
-        # 500 Internal Server Error
-        except jk.exceptions.APIException:
-            try:
-                jikan = jk.Jikan()
-                mal = jikan.search('anime', episode["anime"][:100])
-            except Exception as e:
-                print(e)
-                continue
+        async with AioJikan() as aio_jikan:
+            mal = await aio_jikan.search_anime('anime', episode["anime"][:100])
+    
 
-        mal = mal["results"][0]
+        if mal["data"]:
+            mal = mal["data"][0]
+            
+        else:
+            print(f"Anime {episode['anime']} not found")
+            continue
+
         mal_id = mal["mal_id"]
 
         anime = AnimesNotifier.get(

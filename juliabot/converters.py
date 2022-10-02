@@ -13,14 +13,15 @@ class Anime(commands.Converter):
 
         search = await search_anime("anime", anime_name)
 
+        await msg.delete()
+
         if not search["data"]:
+            await ctx.send(f'Não foi possivel encontrar o anime `{anime_name}`')
             return
         
         anime = search["data"][0]
 
         anime["dubbed"] = dubbed
-
-        await msg.delete()
 
         return anime
 

@@ -22,51 +22,60 @@ async def main():
         if f.endswith(".py") and f.startswith("site_")
     ]
 
-    episodes = []
+    sites = []
     for file in files:
         mod = importlib.import_module(file, "/scraping/animes")
 
         eps = mod.scrap_animes()
-        episodes.extend(eps)
+        sites.append(eps)
 
-    for episode in episodes:
-        async with AioJikan() as aio_jikan:
-            mal = await aio_jikan.search_anime('anime', episode["anime"][:100])
-    
 
-        if mal["data"]:
-            mal = mal["data"][0]
-            
-        else:
-            print(f"Anime {episode['anime']} not found")
-            continue
+    for episodes in sites:
+        c = 0
+        for episode in episodes:
+            if c >= 5:
+                break
 
-        mal_id = mal["mal_id"]
+            async with AioJikan() as aio_jikan:
+                mal = await aio_jikan.search_anime('anime', episode["anime"][:100])
+                await asyncio.sleep(4) # To avoid 429 error
 
-        anime = AnimesNotifier.get(
-            mal_id, episode["episode"], episode["dub"], episode["lang"]
-        )
 
-        if anime is not None:
-            print(episode["anime"], "its already in database.")
-            continue
+            if mal["data"]:
+                mal = mal["data"][0]
+                
+            else:
+                print(f"Anime {episode['anime']} not found")
+                continue
 
-        AnimesNotifier(
-            mal_id=mal_id,
-            episode=episode["episode"],
-            name=episode["anime"],
-            image=episode["image"],
-            url=episode["url"],
-            site=episode["site"],
-            dubbed=episode["dub"],
-            lang=episode["lang"],
-        )
+            mal_id = mal["mal_id"]
 
-        print(
-            f'\t{episode["anime"]} Episode {episode["episode"]}, was added to database.'
-        )
+            anime = AnimesNotifier.get(
+                mal_id, episode["episode"], episode["dub"], episode["lang"]
+            )
 
-        await asyncio.sleep(4) # To avoid 429 error
+            if anime is not None:
+                print(episode["anime"], "its already in database.")
+                c += 1
+                continue
+
+            c = 0
+
+            AnimesNotifier(
+                mal_id=mal_id,
+                episode=episode["episode"],
+                name=episode["anime"],
+                image=episode["image"],
+                url=episode["url"],
+                site=episode["site"],
+                dubbed=episode["dub"],
+                lang=episode["lang"],
+            )
+
+            print(
+                f'\t{episode["anime"]} Episode {episode["episode"]}, was added to database.'
+            )
+
 
 
 if __name__ == "__main__":

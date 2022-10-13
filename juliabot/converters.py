@@ -1,42 +1,6 @@
 from discord.ext import commands
 import datetime
 
-from .utils import search_anime
-
-
-class Anime(commands.Converter):
-    async def convert(self, ctx: commands.Context, argument: str) -> dict | None:
-        msg = await ctx.send(f"Procurando anime: `{argument}`...")
-
-        dubbed = "dublado" in argument.lower()
-        anime_name = argument.replace("dublado", "")
-
-        search = await search_anime("anime", anime_name)
-
-        await msg.delete()
-
-        if not search["data"]:
-            await ctx.send(f'Não foi possivel encontrar o anime `{anime_name}`')
-            return
-        
-        anime = search["data"][0]
-
-        anime["dubbed"] = dubbed
-
-        return anime
-
-
-class Character(commands.Converter):
-    async def convert(self, ctx: commands.Context, argument: str) -> dict | None:
-        msg = await ctx.send(f"Procurando char: `{argument}`...")
-
-        search = await search_anime("character", argument)
-        char = search["results"][0]
-
-        await msg.delete()
-
-        return char
-
 
 class Date(commands.Converter):
     async def convert(self, ctx: commands.Context, argument: str) -> datetime.datetime:

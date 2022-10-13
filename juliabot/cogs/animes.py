@@ -252,7 +252,7 @@ class Animes(commands.Cog, name="animes"):
         anime = await self.jikan.get_anime(mal_id)
         if anime:
             if anime.type == "TV":
-                if not AnimesList.get_anime(mal_id=mal_id):
+                if AnimesList.get(user_id=ctx.author.id, mal_id=mal_id, dubbed=dubbed) is None:
                     AnimesList(
                         mal_id=mal_id,
                         dubbed=dubbed,

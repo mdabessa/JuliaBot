@@ -361,7 +361,7 @@ class Animes(commands.Cog, name="animes"):
                 server = Server.get(str(guild.id))
                 if server.anime_channel is not None:
                     try:
-                        channel = self.bot.fetch_channel(int(server.anime_channel))
+                        channel = await self.bot.fetch_channel(int(server.anime_channel))
                         await channel.send(embed=embed)
 
                     except Forbidden:

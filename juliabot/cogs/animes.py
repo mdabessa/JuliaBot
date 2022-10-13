@@ -5,6 +5,7 @@ from discord.ext import commands, tasks
 from jikan4 import AioJikan
 from typing import Optional
 
+from ..config import BOT_JIKAN_RATE_LIMIT
 from ..embeds.anime import anime_embed, episode_embed
 from ..models import AnimesList, User, Server, AnimesNotifier
 from ..scripts import Script
@@ -17,8 +18,7 @@ class Animes(commands.Cog, name="animes"):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.jikan = AioJikan()
-
+        self.jikan = AioJikan(rate_limit=BOT_JIKAN_RATE_LIMIT)
 
     @staticmethod
     @Script.function(name="search_anime", events=["on_reaction_add"])

@@ -30,6 +30,20 @@ try:
 except KeyError:
     TZ = "UTC"
 
+
+# Jikan's rate limit is per IP, so the default limit (60 requests per minute) should be split across all services (DiscordBot and Scraper)
+try:
+    BOT_JIKAN_RATE_LIMIT = int(environ["BOT_JIKAN_RATE_LIMIT"])
+except KeyError:
+    BOT_JIKAN_RATE_LIMIT = 50
+
+try:
+    SCRAP_JIKAN_RATE_LIMIT = int(environ["SCRAP_JIKAN_RATE_LIMIT"])
+except KeyError:
+    SCRAP_JIKAN_RATE_LIMIT = 10
+
+
+
 try:
     time.tzset()
 except AttributeError:

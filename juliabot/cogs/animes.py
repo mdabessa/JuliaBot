@@ -239,6 +239,36 @@ class Animes(commands.Cog, name="animes"):
         else:
             await ctx.send(f"{user.mention} não tem nenhum anime na lista.")
 
+    @commands.cooldown(1, 4, commands.BucketType.user)
+    @commands.command(
+        name="add_anime",
+        brief="Adiciona um anime na lista.",
+        description="Adiciona um anime na lista utilizando o mal_id para ser notificado quando sair um novo episódio.",
+        aliases=["aa"],
+    )
+    async def add_anime(
+        self, ctx: commands.Context, mal_id: int, dubbed: bool = False
+    ) -> None:
+        anime = await self.jikan.get_anime(mal_id)
+        if anime:
+            if anime.type == "TV":
+                if not AnimesList.get_anime(mal_id=mal_id):
+                    AnimesList(
+                        mal_id=mal_id,
+                        dubbed=dubbed,
+                        user_id=ctx.author.id,
+                    )
+                    await ctx.send(f"`{anime.title}` adicionado na lista!")
+
+                else:
+                    await ctx.send(f"`{anime.title}` já está na lista.")
+
+            else:
+                await ctx.send(f"`{anime.title}` não é um anime.")
+
+        else:
+            await ctx.send("Não foi encontrado nenhum anime com esse ID.")
+
     @commands.command(
         brief="Configure a linguagem dos animes que você quer ser notificado.",
         description="Configure a linguagem dos animes que você quer ser notificado. Possíveis linguagens: `pt-br`, `en-us` e `pt-br/en-us`.",

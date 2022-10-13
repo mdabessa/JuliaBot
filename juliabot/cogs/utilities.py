@@ -21,7 +21,7 @@ class Utilities(commands.Cog):
             lang = args.split(" ")[0]
             if GoogleTranslator().is_language_supported(lang):
                 text = " ".join(args.split(" ")[1:])
-            
+
             else:
                 text = args
                 lang = "pt"
@@ -33,14 +33,12 @@ class Utilities(commands.Cog):
             if len(text) > 2000:
                 await ctx.send("O texto não pode ter mais de 2000 caracteres.")
                 return
-            
+
             translated = GoogleTranslator(source="auto", target=lang).translate(text)
             await ctx.send(translated)
 
-
         except Exception as e:
             await ctx.send(f"Ocorreu um erro ao traduzir o texto: {e}")
-
 
 
 def setup(bot: commands.Bot):

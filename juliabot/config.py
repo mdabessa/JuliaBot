@@ -43,7 +43,6 @@ except KeyError:
     SCRAP_JIKAN_RATE_LIMIT = 10
 
 
-
 try:
     time.tzset()
 except AttributeError:

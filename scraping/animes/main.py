@@ -30,23 +30,20 @@ async def main():
         eps = mod.scrap_animes()
         sites.append(eps)
 
-
     for episodes in sites:
         c = 0
         for episode in episodes:
             if c >= 5:
                 break
 
-            mal = await jikan.search_anime('anime', episode["anime"][:100])
-
+            mal = await jikan.search_anime("anime", episode["anime"][:100])
 
             if mal.data:
                 mal = mal.data[0]
-                
+
             else:
                 print(f"Anime {episode['anime']} not found")
                 continue
-
 
             anime = AnimesNotifier.get(
                 mal.mal_id, episode["episode"], episode["dub"], episode["lang"]
@@ -73,7 +70,6 @@ async def main():
             print(
                 f'\t{episode["anime"]} Episode {episode["episode"]}, was added to database.'
             )
-
 
 
 if __name__ == "__main__":

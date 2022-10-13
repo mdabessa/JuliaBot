@@ -95,7 +95,6 @@ class Animes(commands.Cog, name="animes"):
             cache["color"] = kwargs["color"]
             cache["jikan"] = kwargs["jikan"]
             cache["anime_list"] = kwargs["animes"]
-            cache["author"] = kwargs["ctx"].author
             cache["animes"] = []
             cache["index"] = 0
 
@@ -135,8 +134,8 @@ class Animes(commands.Cog, name="animes"):
 
         elif cache["status"] == "searching":  # Will be updated in the for loop above
             index = cache["index"]
-            if (
-                kwargs["emoji"] == "❌" and cache["author"] == kwargs["user"]
+            if kwargs["emoji"] == "❌" and cache["anime_list"][index].user_id == str(
+                kwargs["user"].id
             ):  # Delete the anime from the list
                 cache["anime_list"][index].delete()
                 await cache["message"].channel.send(
@@ -154,7 +153,9 @@ class Animes(commands.Cog, name="animes"):
 
         else:
             index = cache["index"]
-            if kwargs["emoji"] == "❌" and cache["author"] == kwargs["user"]:  #
+            if kwargs["emoji"] == "❌" and cache["anime_list"][index].user_id == str(
+                kwargs["user"].id
+            ):
                 cache["anime_list"][index].delete()
                 await cache["message"].channel.send(
                     f'`{cache["animes"][index].title}` removido da lista!'

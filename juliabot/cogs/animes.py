@@ -300,7 +300,7 @@ class Animes(commands.Cog, name="animes"):
             )
             return
 
-        channel = self.bot.get_channel(server.anime_channel)
+        channel = self.bot.get_channel(int(server.anime_channel))
 
         if channel is None:
             await ctx.send(

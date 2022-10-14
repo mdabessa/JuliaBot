@@ -347,15 +347,18 @@ class Animes(commands.Cog, name="animes"):
             users = AnimesList.get_anime(mal_id=anime.mal_id, dubbed=anime.dubbed)
             for user in users:
                 try:
-                    user = await self.bot.fetch_user(user.user_id)
-
+                    user = await self.bot.fetch_user(int(user.user_id))
                     await user.send(embed=embed)
 
                 except Forbidden:
                     user.delete()
                     print(f"User {user.user_id} has blocked the bot.")
+
                 except NotFound:
-                    pass
+                    print(f"User {user.user_id} not found.")
+                
+                except Exception as e:
+                    print(e)
 
             for guild in self.bot.guilds:
                 server = Server.get(str(guild.id))
@@ -369,7 +372,10 @@ class Animes(commands.Cog, name="animes"):
                         print(f"Bot has no permission to send messages in {channel}")
 
                     except NotFound:
-                        pass
+                        print(f"Channel {server.anime_channel} not found.")
+                    
+                    except Exception as e:
+                        print(e)
 
             anime.set_notified(True)
 

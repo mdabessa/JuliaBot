@@ -346,6 +346,9 @@ class Animes(commands.Cog, name="animes"):
 
             users = AnimesList.get_anime(mal_id=anime.mal_id, dubbed=anime.dubbed)
             for user in users:
+                if anime.lang.lower() not in user.lang.lower():
+                    continue
+
                 try:
                     user = await self.bot.fetch_user(int(user.user_id))
                     await user.send(embed=embed)

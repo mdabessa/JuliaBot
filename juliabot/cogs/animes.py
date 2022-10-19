@@ -366,20 +366,22 @@ class Animes(commands.Cog, name="animes"):
 
             for guild in self.bot.guilds:
                 server = Server.get(str(guild.id))
-                if server.anime_channel is not None:
-                    try:
-                        channel = await self.bot.fetch_channel(int(server.anime_channel))
-                        await channel.send(embed=embed)
+                if (server is None) or (server.anime_channel is None):
+                    continue
 
-                    except Forbidden:
-                        server.set_anime_channel(None)
-                        print(f"Bot has no permission to send messages in {channel}")
+                try:
+                    channel = await self.bot.fetch_channel(int(server.anime_channel))
+                    await channel.send(embed=embed)
 
-                    except NotFound:
-                        print(f"Channel {server.anime_channel} not found.")
-                    
-                    except Exception as e:
-                        print(e)
+                except Forbidden:
+                    server.set_anime_channel(None)
+                    print(f"Bot has no permission to send messages in {channel}")
+
+                except NotFound:
+                    print(f"Channel {server.anime_channel} not found.")
+                
+                except Exception as e:
+                    print(e)
 
             anime.set_notified(True)
 

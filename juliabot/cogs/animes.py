@@ -346,7 +346,7 @@ class Animes(commands.Cog, name="animes"):
 
             users = AnimesList.get_anime(mal_id=anime.mal_id, dubbed=anime.dubbed)
             for user in users:
-                _user = User.get(str(user.user_id))
+                _user = User.get_or_create(str(user.user_id))
                 if anime.lang.lower() not in _user.anime_lang.lower():
                     continue
 

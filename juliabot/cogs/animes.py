@@ -352,7 +352,8 @@ class Animes(commands.Cog, name="animes"):
 
                 try:
                     discord_user = await self.bot.fetch_user(int(user.user_id))
-                    await discord_user.send(embed=embed)
+                    msg = await discord_user.send(embed=embed)
+                    await msg.add_reaction("👍") # Help the user mark the episode as watched
 
                 except Forbidden:
                     user.delete()

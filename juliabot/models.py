@@ -30,7 +30,11 @@ class Model(Base):
         self.update()
 
     def update(self) -> None:
-        session.commit()
+        try:
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise Exception("Failed to commit to database")
 
     @classmethod
     def select(cls, key: str, value: str) -> list:

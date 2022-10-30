@@ -204,7 +204,7 @@ class AnimesNotifier(Model):
     def keep_limit(cls):
         LIM = 1000
         rows = cls.select_all()
-
+        rows.reverse() # Reverse the list to delete the oldest rows first
         if len(rows) > LIM:
             for i in range(len(rows) - LIM):
                 rows[i].delete()

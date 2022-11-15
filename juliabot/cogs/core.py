@@ -70,7 +70,7 @@ class Core(commands.Cog, name="core"):
         if scr and "on_reaction_add" in scr[0].func["events"]:
             await scr[0].execute(user=user, emoji=reaction.emoji)
 
-    @tasks.loop(seconds=30)
+    @tasks.loop(seconds=30, reconnect=True)
     async def scripts_time_out(self):
         now = datetime.now()
         for script in Script.get_scripts().copy():

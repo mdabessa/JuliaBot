@@ -336,7 +336,7 @@ class Animes(commands.Cog, name="animes"):
     async def on_ready(self):
         self.anime_notifier.start()
 
-    @tasks.loop(minutes=1)
+    @tasks.loop(minutes=1, reconnect=True)
     async def anime_notifier(self):
         animes = AnimesNotifier.get_not_notified()
 

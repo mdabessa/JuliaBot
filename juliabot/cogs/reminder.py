@@ -28,7 +28,7 @@ class _Reminder(commands.Cog, name="reminder"):
             f'OK, Eu irei te notificar no dia `{date.strftime("%d/%m/%Y %H:%M")}`!'
         )
 
-    @tasks.loop(seconds=60)
+    @tasks.loop(seconds=60, reconnect=True)
     async def reminder(self):
         expired = Reminder.get_expired()
 

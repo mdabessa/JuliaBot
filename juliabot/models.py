@@ -150,6 +150,7 @@ class AnimesNotifier(Model):
     url = Column(String, nullable=False)
     site = Column(String, nullable=False)
     notified = Column(Boolean, nullable=False, default=False)
+    date = Column(DateTime(timezone=True), server_default=func.now())
 
     def __init__(
         self,
@@ -201,10 +202,13 @@ class AnimesNotifier(Model):
         )
 
     @classmethod
+    def get_desc(cls) -> List[AnimesNotifier]:
+        return session.query(cls).order_by(cls.date.desc()).all() # Oldest first
+
+    @classmethod
     def keep_limit(cls):
         LIM = 1000
-        rows = cls.select_all()
-        rows.reverse() # Reverse the list to delete the oldest rows first
+        rows = cls.get_desc()
         if len(rows) > LIM:
             for i in range(len(rows) - LIM):
                 rows[i].delete()

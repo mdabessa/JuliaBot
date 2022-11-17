@@ -336,55 +336,59 @@ class Animes(commands.Cog, name="animes"):
     async def on_ready(self):
         self.anime_notifier.start()
 
-    @tasks.loop(minutes=1, reconnect=True)
+    @tasks.loop(minutes=1)
     async def anime_notifier(self):
-        animes = AnimesNotifier.get_not_notified()
+        try:
+            animes = AnimesNotifier.get_not_notified()
 
-        animes.reverse()  # To notify the last added anime first
-        for anime in animes:
-            embed = episode_embed(anime, self.bot.color)
+            animes.reverse()  # To notify the last added anime first
+            for anime in animes:
+                embed = episode_embed(anime, self.bot.color)
 
-            users = AnimesList.get_anime(mal_id=anime.mal_id, dubbed=anime.dubbed)
-            for user in users:
-                _user = User.get_or_create(str(user.user_id))
-                if anime.lang.lower() not in _user.anime_lang.lower():
-                    continue
+                users = AnimesList.get_anime(mal_id=anime.mal_id, dubbed=anime.dubbed)
+                for user in users:
+                    _user = User.get_or_create(str(user.user_id))
+                    if anime.lang.lower() not in _user.anime_lang.lower():
+                        continue
 
-                try:
-                    discord_user = await self.bot.fetch_user(int(user.user_id))
-                    msg = await discord_user.send(embed=embed)
-                    await msg.add_reaction("👍") # Help the user mark the episode as watched
+                    try:
+                        discord_user = await self.bot.fetch_user(int(user.user_id))
+                        msg = await discord_user.send(embed=embed)
+                        await msg.add_reaction("👍") # Help the user mark the episode as watched
 
-                except Forbidden:
-                    user.delete()
-                    print(f"User {user.user_id} has blocked the bot.")
+                    except Forbidden:
+                        user.delete()
+                        print(f"User {user.user_id} has blocked the bot.")
 
-                except NotFound:
-                    print(f"User {user.user_id} not found.")
-                
-                except Exception as e:
-                    print(e)
+                    except NotFound:
+                        print(f"User {user.user_id} not found.")
+                    
+                    except Exception as e:
+                        print(e)
 
-            for guild in self.bot.guilds:
-                server = Server.get(str(guild.id))
-                if (server is None) or (server.anime_channel is None):
-                    continue
+                for guild in self.bot.guilds:
+                    server = Server.get(str(guild.id))
+                    if (server is None) or (server.anime_channel is None):
+                        continue
 
-                try:
-                    channel = await self.bot.fetch_channel(int(server.anime_channel))
-                    await channel.send(embed=embed)
+                    try:
+                        channel = await self.bot.fetch_channel(int(server.anime_channel))
+                        await channel.send(embed=embed)
 
-                except Forbidden:
-                    server.set_anime_channel(None)
-                    print(f"Bot has no permission to send messages in {channel}")
+                    except Forbidden:
+                        server.set_anime_channel(None)
+                        print(f"Bot has no permission to send messages in {channel}")
 
-                except NotFound:
-                    print(f"Channel {server.anime_channel} not found.")
-                
-                except Exception as e:
-                    print(e)
+                    except NotFound:
+                        print(f"Channel {server.anime_channel} not found.")
+                    
+                    except Exception as e:
+                        print(e)
 
-            anime.set_notified(True)
+                anime.set_notified(True)
+        
+        except Exception as e:
+            print(e)
 
 
 def setup(bot: commands.Bot):

@@ -41,7 +41,7 @@ async def main():
             if c >= 5:
                 break
 
-            mal = await jikan.search_anime("anime", episode["anime"][:100])
+            mal = await jikan.search_anime("tv", episode["anime"][:100])
 
             if mal.data:
                 mal = mal.data[0]

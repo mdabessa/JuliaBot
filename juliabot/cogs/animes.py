@@ -142,7 +142,7 @@ class Animes(commands.Cog, name="animes"):
                     f'`{cache["animes"][index].title}` removido da lista!'
                 )
                 cache["animes"].pop(index)
-                index -= 1
+                cache["anime_list"].pop(index)
 
             if kwargs["emoji"] == "⬅️":
                 index -= 1
@@ -161,7 +161,7 @@ class Animes(commands.Cog, name="animes"):
                     f'`{cache["animes"][index].title}` removido da lista!'
                 )
                 cache["animes"].pop(index)
-                index -= 1
+                cache["anime_list"].pop(index)
 
             if kwargs["emoji"] == "⬅️":
                 index -= 1

@@ -55,7 +55,7 @@ class Animes(commands.Cog, name="animes"):
                     mal_id=cache["anime_search"].data[cache["index"]].mal_id,
                     dubbed=cache["dubbed"],
                 ):
-                    await cache["message"].channel.send("Anime ja esta na lista!")
+                    await cache["message"].channel.send(f"`{cache['anime_search'].data[cache['index']].title}` já está na sua lista!")
                 else:
                     AnimesList(
                         user_id=kwargs["user"].id,
@@ -190,7 +190,7 @@ class Animes(commands.Cog, name="animes"):
         name="search_anime",
         brief="Pesquisa um anime.",
         description="Pesquisa um anime no MyAnimeList.",
-        aliases=["anime", "ai"],
+        aliases=["anime", "ai", "sa"],
     )
     async def search_anime(self, ctx: commands.Context, *, anime: str) -> None:
         dubbed = False

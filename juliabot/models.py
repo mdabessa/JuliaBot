@@ -174,7 +174,6 @@ class AnimesNotifier(Model):
             lang=str(lang),
         )
 
-        self.keep_limit()
 
     def set_notified(self, notified: bool):
         self.notified = bool(notified)
@@ -204,14 +203,6 @@ class AnimesNotifier(Model):
     @classmethod
     def get_desc(cls) -> List[AnimesNotifier]:
         return session.query(cls).order_by(cls.date.desc()).all() # Oldest first
-
-    @classmethod
-    def keep_limit(cls):
-        LIM = 1000
-        rows = cls.get_desc()
-        if len(rows) > LIM:
-            for i in range(len(rows) - LIM):
-                rows[i].delete()
 
 
 class AnimesList(Model):

@@ -11,7 +11,11 @@ from juliabot.config import ANIME_SCRAP_TIME
 
 async def loop():
     while True:
-        await main()
+        try:
+            await main()
+        except Exception as e:
+            print(e)
+        
         await asyncio.sleep(ANIME_SCRAP_TIME)
 
 

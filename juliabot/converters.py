@@ -27,7 +27,9 @@ class Date(commands.Converter):
 
 
 class DeltaToDate(commands.Converter):
-    async def convert(self, ctx: commands.Context, argument: str) -> datetime.datetime:
+    async def convert(self, ctx: commands.Context, argument: str, start: datetime = None) -> datetime.datetime:
+        start = start or datetime.datetime.now()
+        
         leg = {
             "minute": ["m", "min", "minute", "minutes", "minuto", "minutos"],
             "hour": ["h", "hour", "hours", "hora", "horas", "hr", "hrs"],
@@ -89,4 +91,4 @@ class DeltaToDate(commands.Converter):
                 f"Delta não pode ser menor que 0 ou maior que {limit} segundos"
             )
 
-        return datetime.datetime.now() + delta
+        return start + delta

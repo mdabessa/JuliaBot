@@ -121,21 +121,26 @@ class Reminder(Model):
     user_id = Column(String, nullable=False)
     time_created = Column(DateTime(timezone=True), server_default=func.now())
     time_reminder = Column(DateTime, nullable=False)
+    date_command = Column(String, default=None)
 
     def __init__(
-        self, channel_id: str, message_id: str, user_id: str, time_reminder: datetime
+        self, channel_id: str, message_id: str, user_id: str, time_reminder: datetime, date_command: str = None
     ) -> None:
         super().__init__(
             channel_id=str(channel_id),
             message_id=str(message_id),
             user_id=str(user_id),
             time_reminder=time_reminder,
+            date_command=date_command,
         )
 
     @classmethod
     def get_expired(cls) -> List[Reminder]:
         return session.query(cls).filter(cls.time_reminder <= datetime.now()).all()
-
+    
+    @classmethod
+    def get_all(cls, user_id: str) -> List[Reminder]:
+        return session.query(cls).filter(cls.user_id == str(user_id)).all()
 
 class AnimesNotifier(Model):
     __tablename__ = "animes_notifier"

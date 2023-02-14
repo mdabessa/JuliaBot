@@ -55,7 +55,9 @@ class Animes(commands.Cog, name="animes"):
                     mal_id=cache["anime_search"].data[cache["index"]].mal_id,
                     dubbed=cache["dubbed"],
                 ):
-                    await cache["message"].channel.send(f"`{cache['anime_search'].data[cache['index']].title}` já está na sua lista!")
+                    await cache["message"].channel.send(
+                        f"`{cache['anime_search'].data[cache['index']].title}` já está na sua lista!"
+                    )
                 else:
                     AnimesList(
                         user_id=kwargs["user"].id,
@@ -252,7 +254,10 @@ class Animes(commands.Cog, name="animes"):
         anime = await self.jikan.get_anime(mal_id)
         if anime:
             if anime.type == "TV":
-                if AnimesList.get(user_id=ctx.author.id, mal_id=mal_id, dubbed=dubbed) is None:
+                if (
+                    AnimesList.get(user_id=ctx.author.id, mal_id=mal_id, dubbed=dubbed)
+                    is None
+                ):
                     AnimesList(
                         mal_id=mal_id,
                         dubbed=dubbed,
@@ -354,7 +359,9 @@ class Animes(commands.Cog, name="animes"):
                     try:
                         discord_user = await self.bot.fetch_user(int(user.user_id))
                         msg = await discord_user.send(embed=embed)
-                        await msg.add_reaction("👍") # Help the user mark the episode as watched
+                        await msg.add_reaction(
+                            "👍"
+                        )  # Help the user mark the episode as watched
 
                     except Forbidden:
                         user.delete()
@@ -362,7 +369,7 @@ class Animes(commands.Cog, name="animes"):
 
                     except NotFound:
                         print(f"User {user.user_id} not found.")
-                    
+
                     except Exception as e:
                         print(e)
 
@@ -372,7 +379,9 @@ class Animes(commands.Cog, name="animes"):
                         continue
 
                     try:
-                        channel = await self.bot.fetch_channel(int(server.anime_channel))
+                        channel = await self.bot.fetch_channel(
+                            int(server.anime_channel)
+                        )
                         await channel.send(embed=embed)
 
                     except Forbidden:
@@ -381,12 +390,12 @@ class Animes(commands.Cog, name="animes"):
 
                     except NotFound:
                         print(f"Channel {server.anime_channel} not found.")
-                    
+
                     except Exception as e:
                         print(e)
 
                 anime.set_notified(True)
-        
+
         except Exception as e:
             print(e)
 

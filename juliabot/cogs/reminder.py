@@ -49,7 +49,9 @@ class _Reminder(commands.Cog, name="reminder"):
             elif kwargs["emoji"] == "❌" and kwargs["user"].id == int(reminder.user_id):
                 cache["reminders"].remove(reminder)
                 reminder.delete()
-                await cache["message"].channel.send(f'Lembrete de `{reminder.time_reminder.strftime("%d/%m/%Y %H:%M")}` deletado com sucesso!')
+                await cache["message"].channel.send(
+                    f'Lembrete de `{reminder.time_reminder.strftime("%d/%m/%Y %H:%M")}` deletado com sucesso!'
+                )
 
             if index < 0:
                 index = len(cache["reminders"]) - 1
@@ -60,10 +62,14 @@ class _Reminder(commands.Cog, name="reminder"):
                 cache["index"] = index
                 reminder = cache["reminders"][cache["index"]]
                 embed = await reminder_embed(reminder, cache["bot"])
-                embed.set_footer(text=f"{index + 1}/{len(cache['reminders'])} Lembrete(s)")
+                embed.set_footer(
+                    text=f"{index + 1}/{len(cache['reminders'])} Lembrete(s)"
+                )
                 await cache["message"].edit(embed=embed)
             else:
-                await cache["message"].edit(content="Você não tem nenhum lembrete!", embed=None)
+                await cache["message"].edit(
+                    content="Você não tem nenhum lembrete!", embed=None
+                )
                 cache["status"] = 0
 
     @commands.command(
@@ -76,7 +82,7 @@ class _Reminder(commands.Cog, name="reminder"):
             return await ctx.reply("Você não tem nenhum lembrete!")
 
         scr = Script(
-            name= f"{ctx.author.id}_list_reminders",
+            name=f"{ctx.author.id}_list_reminders",
             function_name="list_reminders",
             time_out=180,
         )
@@ -109,7 +115,6 @@ class _Reminder(commands.Cog, name="reminder"):
             f'OK, Eu irei te notificar dia `{date.strftime("%d/%m/%Y %H:%M")}`'
         )
 
-
     @tasks.loop(seconds=20, reconnect=True)
     async def reminder(self):
         expired = Reminder.get_expired()
@@ -117,14 +122,14 @@ class _Reminder(commands.Cog, name="reminder"):
         for _reminder in expired:
             try:
                 channel = self.bot.get_channel(int(_reminder.channel_id))
-                message = await channel.fetch_message(
-                    int(_reminder.message_id)
-                )
+                message = await channel.fetch_message(int(_reminder.message_id))
 
                 text = ""
 
                 if _reminder.date_command:
-                    new_date = await DeltaToDate.convert(None, message, _reminder.date_command)
+                    new_date = await DeltaToDate.convert(
+                        None, message, _reminder.date_command
+                    )
                     _reminder.time_reminder = new_date
                     _reminder.update()
                     text += f" (Irei te lembrar novamente dia `{new_date.strftime('%d/%m/%Y %H:%M')}`)"

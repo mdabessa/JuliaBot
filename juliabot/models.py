@@ -124,7 +124,12 @@ class Reminder(Model):
     date_command = Column(String, default=None)
 
     def __init__(
-        self, channel_id: str, message_id: str, user_id: str, time_reminder: datetime, date_command: str = None
+        self,
+        channel_id: str,
+        message_id: str,
+        user_id: str,
+        time_reminder: datetime,
+        date_command: str = None,
     ) -> None:
         super().__init__(
             channel_id=str(channel_id),
@@ -137,10 +142,11 @@ class Reminder(Model):
     @classmethod
     def get_expired(cls) -> List[Reminder]:
         return session.query(cls).filter(cls.time_reminder <= datetime.now()).all()
-    
+
     @classmethod
     def get_all(cls, user_id: str) -> List[Reminder]:
         return session.query(cls).filter(cls.user_id == str(user_id)).all()
+
 
 class AnimesNotifier(Model):
     __tablename__ = "animes_notifier"
@@ -179,7 +185,6 @@ class AnimesNotifier(Model):
             lang=str(lang),
         )
 
-
     def set_notified(self, notified: bool):
         self.notified = bool(notified)
         self.update()
@@ -207,7 +212,7 @@ class AnimesNotifier(Model):
 
     @classmethod
     def get_desc(cls) -> List[AnimesNotifier]:
-        return session.query(cls).order_by(cls.date.desc()).all() # Oldest first
+        return session.query(cls).order_by(cls.date.desc()).all()  # Oldest first
 
 
 class AnimesList(Model):

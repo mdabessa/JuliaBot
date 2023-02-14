@@ -26,14 +26,13 @@ async def main():
     sites = []
     for file in files:
         mod = importlib.import_module(file, "/scraping/animes")
-        
+
         try:
             eps = mod.scrap_animes()
             sites.append(eps)
 
         except Exception as e:
             print(f"Error in {file} : {e}")
-
 
     for episodes in sites:
         c = 0

@@ -15,7 +15,7 @@ async def loop():
             await main()
         except Exception as e:
             print(e)
-        
+
         await asyncio.sleep(ANIME_SCRAP_TIME)
 
 

@@ -27,9 +27,11 @@ class Date(commands.Converter):
 
 
 class DeltaToDate(commands.Converter):
-    async def convert(self, ctx: commands.Context, argument: str, start: datetime = None) -> datetime.datetime:
+    async def convert(
+        self, ctx: commands.Context, argument: str, start: datetime = None
+    ) -> datetime.datetime:
         start = start or datetime.datetime.now()
-        
+
         leg = {
             "minute": ["m", "min", "minute", "minutes", "minuto", "minutos"],
             "hour": ["h", "hour", "hours", "hora", "horas", "hr", "hrs"],

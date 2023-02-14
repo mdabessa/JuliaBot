@@ -10,7 +10,7 @@ async def reminder_embed(reminder: Reminder, bot) -> Embed:
         title=":alarm_clock: Lembrete :alarm_clock:",
         color=bot.color,
     )
-    
+
     date = reminder.time_reminder.strftime("%d/%m/%Y %H:%M")
     embed.add_field(name="Data:", value=date, inline=False)
 
@@ -23,8 +23,14 @@ async def reminder_embed(reminder: Reminder, bot) -> Embed:
 
     if reminder.date_command is not None:
         embed.add_field(name="Comando:", value=reminder.date_command, inline=False)
-        next_reminder = await DeltaToDate.convert(None, None, reminder.date_command, start=reminder.time_reminder)
+        next_reminder = await DeltaToDate.convert(
+            None, None, reminder.date_command, start=reminder.time_reminder
+        )
         next_reminder = next_reminder.strftime("%d/%m/%Y %H:%M")
-        embed.add_field(name="Próximo lembrete (lembrete recorrente):", value=next_reminder, inline=False)
+        embed.add_field(
+            name="Próximo lembrete (lembrete recorrente):",
+            value=next_reminder,
+            inline=False,
+        )
 
     return embed

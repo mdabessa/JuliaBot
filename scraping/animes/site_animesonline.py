@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import requests
 
 
-URL = "https://animesonline.org"
+URL = "https://animesonline.cc"
 
 
 def extract_number(string: str) -> int:

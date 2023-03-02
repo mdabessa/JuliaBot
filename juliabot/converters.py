@@ -1,5 +1,6 @@
 from discord.ext import commands
 import datetime
+import re
 
 
 class Date(commands.Converter):
@@ -31,6 +32,7 @@ class DeltaToDate(commands.Converter):
         self, ctx: commands.Context, argument: str, start: datetime = None
     ) -> datetime.datetime:
         start = start or datetime.datetime.now()
+        regex = r"(\d+)([a-zA-Z]+)"
 
         leg = {
             "minute": ["m", "min", "minute", "minutes", "minuto", "minutos"],
@@ -41,29 +43,10 @@ class DeltaToDate(commands.Converter):
             "year": ["y", "year", "years", "a", "ano", "anos"],
         }
 
-        deltas = []
-        l = 0
-        num = ""
-        word = ""
-        for i in argument:
-            try:
-                _num = str(int(i))
-                if l == 1:
-                    deltas.append([num, word])
-                    l = 0
-                    num = _num
-                    word = ""
-                else:
-                    num += _num
-
-            except:
-                l = 1
-                word += i
-
-        deltas.append([num, word])
+        results = re.findall(regex, argument)
 
         time = 0
-        for delta in deltas:
+        for delta in results:
             if delta[0] == "" or delta[1] == "":
                 continue
 

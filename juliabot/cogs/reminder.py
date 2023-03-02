@@ -3,7 +3,7 @@ from discord import Embed
 from discord.ext import commands, tasks
 
 from ..models import Reminder
-from ..converters import Date, DeltaToDate
+from ..converters import Date, DeltaToDate, NextDate
 from ..scripts import Script
 from ..embeds.reminder import reminder_embed
 
@@ -93,7 +93,7 @@ class _Reminder(commands.Cog, name="reminder"):
         brief="Irei te notificar no dia desejado, relembrando sua mensagem!",
         aliases=["rm", "lembrete", "remind"],
     )
-    async def remember_me(self, ctx: commands.Context, date: Union[Date, DeltaToDate]):
+    async def remember_me(self, ctx: commands.Context, date: Union[Date, DeltaToDate, NextDate]):
         Reminder(ctx.channel.id, ctx.message.id, ctx.author.id, date)
         await ctx.reply(
             f'OK, Eu irei te notificar no dia `{date.strftime("%d/%m/%Y %H:%M")}`!'
@@ -104,12 +104,15 @@ class _Reminder(commands.Cog, name="reminder"):
         aliases=["rml", "lembretel", "remindloop"],
     )
     async def remember_me_loop(self, ctx: commands.Context, arg: str):
-        try:
-            date = await DeltaToDate.convert(None, ctx, arg)
-        except Exception as e:
-            print(e)
-            return await ctx.reply("Por favor, use um formato de data válido!")
-
+        converters = [DeltaToDate, NextDate]
+        for converter in converters:
+            try:
+                date = await converter.convert(None, ctx, arg)
+                break
+            except Exception:
+                if converter == converters[-1]:
+                    return await ctx.reply("Por favor, use um formato de data válido!")
+        
         Reminder(ctx.channel.id, ctx.message.id, ctx.author.id, date, arg)
         await ctx.reply(
             f'OK, Eu irei te notificar dia `{date.strftime("%d/%m/%Y %H:%M")}`'
@@ -117,6 +120,7 @@ class _Reminder(commands.Cog, name="reminder"):
 
     @tasks.loop(seconds=20, reconnect=True)
     async def reminder(self):
+        converters = [DeltaToDate, NextDate]
         expired = Reminder.get_expired()
 
         for _reminder in expired:
@@ -127,9 +131,15 @@ class _Reminder(commands.Cog, name="reminder"):
                 text = ""
 
                 if _reminder.date_command:
-                    new_date = await DeltaToDate.convert(
-                        None, message, _reminder.date_command
-                    )
+                    for converter in converters:
+                        try:
+                            new_date = await converter.convert(None, message, _reminder.date_command)
+                            break
+                        except Exception:
+                            if converter == converters[-1]:
+                                _reminder.delete()
+                                raise Exception("Date command cannot be converted!")
+
                     _reminder.time_reminder = new_date
                     _reminder.update()
                     text += f" (Irei te lembrar novamente dia `{new_date.strftime('%d/%m/%Y %H:%M')}`)"

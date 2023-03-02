@@ -1,5 +1,6 @@
 from discord.ext import commands
 import datetime
+from dateutil.relativedelta import relativedelta
 import re
 
 
@@ -31,6 +32,9 @@ class DeltaToDate(commands.Converter):
     async def convert(
         self, ctx: commands.Context, argument: str, start: datetime = None
     ) -> datetime.datetime:
+        if not argument[0].isdigit():
+            raise Exception(f"Não é possivel converter {argument} em DeltaToDate.")
+
         start = start or datetime.datetime.now()
         regex = r"(\d+)([a-zA-Z]+)"
 
@@ -77,3 +81,39 @@ class DeltaToDate(commands.Converter):
             )
 
         return start + delta
+
+
+class NextDate(commands.Converter):
+    async def convert(
+        self, ctx: commands.Context, argument: str, start: datetime = None
+    ) -> datetime.datetime:
+        if argument[0].isdigit():
+            raise Exception(f"Não é possivel converter {argument} em NextDate.")
+
+        date = start or datetime.datetime.now()
+        regex = r"([a-zA-Z]+)(\d+)"
+
+        steps = {
+                "minute": ["m", "min", "minute", "minutes", "minuto", "minutos"],
+                "hour": ["h", "hour", "hours", "hora", "horas", "hr", "hrs"],
+                "day": ["d", "day", "days", "dia", "dias"],
+                "month": ["month", "months", "mes", "meses", "mês"],
+                "year": ["y", "year", "years", "a", "ano", "anos"],
+            }
+        
+        results = re.findall(regex, argument)
+        for res in results:
+            step = [x for x in steps if res[0] in steps[x]][0]
+            num = int(res[1])
+
+            date += relativedelta(**{step:num})
+
+            if date < datetime.datetime.now():
+                index = list(steps.keys()).index(step)
+                if index + 1 == len(steps):
+                    raise Exception("O ano não pode ser menor que o ano atual.")
+
+                next_step = list(steps.keys())[index + 1]
+                date += relativedelta(**{next_step+'s':1})
+
+        return date

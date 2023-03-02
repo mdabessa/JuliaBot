@@ -39,7 +39,7 @@ class DeltaToDate(commands.Converter):
             "hour": ["h", "hour", "hours", "hora", "horas", "hr", "hrs"],
             "day": ["d", "day", "days", "dia", "dias"],
             "week": ["w", "week", "weeks", "semana", "semanas"],
-            "mounth": ["mounth", "mounths", "mes", "meses", "mês"],
+            "month": ["month", "months", "mes", "meses", "mês"],
             "year": ["y", "year", "years", "a", "ano", "anos"],
         }
 

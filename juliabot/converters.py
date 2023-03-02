@@ -34,8 +34,8 @@ class DeltaToDate(commands.Converter):
         start = start or datetime.datetime.now()
         regex = r"(\d+)([a-zA-Z]+)"
 
-        leg = {
-            "minute": ["m", "min", "minute", "minutes", "minuto", "minutos"],
+        steps = {
+            "minute": ["m", "min", "minute", "milegnutes", "minuto", "minutos"],
             "hour": ["h", "hour", "hours", "hora", "horas", "hr", "hrs"],
             "day": ["d", "day", "days", "dia", "dias"],
             "week": ["w", "week", "weeks", "semana", "semanas"],
@@ -53,17 +53,17 @@ class DeltaToDate(commands.Converter):
             num = int(delta[0])
             word = delta[1]
 
-            if word in leg["minute"]:
+            if word in steps["minute"]:
                 time += num * 60
-            elif word in leg["hour"]:
+            elif word in steps["hour"]:
                 time += num * 3600
-            elif word in leg["day"]:
+            elif word in steps["day"]:
                 time += num * 86400
-            elif word in leg["week"]:
+            elif word in steps["week"]:
                 time += num * 604800
-            elif word in leg["mounth"]:
+            elif word in steps["mounth"]:
                 time += num * 2592000
-            elif word in leg["year"]:
+            elif word in steps["year"]:
                 time += num * 31536000
             else:
                 raise Exception(f"Não é possivel converter {word} em tempo.")

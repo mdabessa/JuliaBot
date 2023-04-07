@@ -4,6 +4,29 @@ from dateutil.relativedelta import relativedelta
 import re
 
 
+def split_word(word, reverse=False):
+    if reverse:
+        regex = r'(\d+)([a-zA-Z]*)'
+    else:
+        regex = r'([a-zA-Z]+)(\d+)'
+        
+    matches = re.findall(regex, word)
+    result = []
+    for match in matches:
+        if reverse:
+            num, chars = match
+        else:
+            chars, num = match
+
+        if num:
+            num = int(num)
+        else:
+            num = 1
+
+        result.append([num, chars])
+    return result
+
+
 class Date(commands.Converter):
     async def convert(self, ctx: commands.Context, argument: str) -> datetime.datetime:
         formats = [
@@ -35,42 +58,44 @@ class DeltaToDate(commands.Converter):
         if not argument[0].isdigit():
             raise Exception(f"Não é possivel converter {argument} em DeltaToDate.")
 
+        print(argument)
         start = start or datetime.datetime.now()
-        regex = r"(\d+)([a-zA-Z]+)"
-
         steps = {
-            "minute": ["m", "min", "minute", "milegnutes", "minuto", "minutos"],
+            "minute": ["min", "minute", "minutes", "minuto", "minutos"],
             "hour": ["h", "hour", "hours", "hora", "horas", "hr", "hrs"],
             "day": ["d", "day", "days", "dia", "dias"],
             "week": ["w", "week", "weeks", "semana", "semanas"],
-            "month": ["month", "months", "mes", "meses", "mês"],
+            "mounth": ["mounth", "mounths", "mes", "meses", "mês"],
             "year": ["y", "year", "years", "a", "ano", "anos"],
         }
 
-        results = re.findall(regex, argument)
-
         time = 0
-        for delta in results:
-            if delta[0] == "" or delta[1] == "":
+        results = split_word(argument, reverse=True)
+        for res in results:
+            num = res[0]
+            step = None
+            for key, value in steps.items():
+                if res[1] in value:
+                    step = key
+                    break
+            
+            if not step:
                 continue
 
-            num = int(delta[0])
-            word = delta[1]
-
-            if word in steps["minute"]:
+            if step in steps["minute"]:
                 time += num * 60
-            elif word in steps["hour"]:
+            elif step in steps["hour"]:
                 time += num * 3600
-            elif word in steps["day"]:
+            elif step in steps["day"]:
                 time += num * 86400
-            elif word in steps["week"]:
+            elif step in steps["week"]:
                 time += num * 604800
-            elif word in steps["mounth"]:
+            elif step in steps["mounth"]:
                 time += num * 2592000
-            elif word in steps["year"]:
+            elif step in steps["year"]:
                 time += num * 31536000
             else:
-                raise Exception(f"Não é possivel converter {word} em tempo.")
+                raise Exception(f"Não é possivel converter {step} em tempo.")
 
         delta = datetime.timedelta(seconds=time)
 
@@ -91,21 +116,26 @@ class NextDate(commands.Converter):
             raise Exception(f"Não é possivel converter {argument} em NextDate.")
 
         date = start or datetime.datetime.now()
-        regex = r"([a-zA-Z]+)(\d+)"
-
         steps = {
-                "minute": ["m", "min", "minute", "minutes", "minuto", "minutos"],
-                "hour": ["h", "hour", "hours", "hora", "horas", "hr", "hrs"],
-                "day": ["d", "day", "days", "dia", "dias"],
-                "month": ["month", "months", "mes", "meses", "mês"],
-                "year": ["y", "year", "years", "a", "ano", "anos"],
-            }
-        
-        results = re.findall(regex, argument)
+            "minute": ["min", "minute", "minutes", "minuto", "minutos"],
+            "hour": ["h", "hour", "hours", "hora", "horas", "hr", "hrs"],
+            "day": ["d", "day", "days", "dia", "dias"],
+            "month": ["month", "months", "mes", "meses", "mês"],
+            "year": ["y", "year", "years", "a", "ano", "anos"],
+        }
+    
+        results = split_word(argument)
         for res in results:
-            step = [x for x in steps if res[0] in steps[x]][0]
-            num = int(res[1])
+            step = None
+            for key, value in steps.items():
+                if res[1] in value:
+                    step = key
+                    break
+            
+            if not step:
+                continue
 
+            num = res[0]
             date += relativedelta(**{step:num})
 
             if date < datetime.datetime.now():

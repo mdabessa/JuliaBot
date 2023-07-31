@@ -66,18 +66,36 @@ class Fun(commands.Cog, name="fun"):
         await scr.execute(message=ctx.message)
 
     @commands.command(name="dice", brief="Role um dado.", aliases=["dado", "d", "roll"])
-    async def dice(self, ctx: commands.Context, sides: Optional[int] = 6):
+    async def dice(self, ctx: commands.Context, *, args: Optional[str] = None):
         view_rolls = 3
-        if sides < 2:
-            await ctx.send("O dado precisa ter mais de 1 lado!")
-            return
-        
-        results = list(range(1, sides+1))
-        shuffle(results)
-        if sides <= view_rolls:
-            for i in range(0, view_rolls-len(results)):
-                results.append(randint(1, sides))
+        if args is None:
+            args = "6"
 
+        try:
+            sides = int(args)
+            if sides < 2:
+                await ctx.send("O dado precisa ter mais de 1 lado!")
+                return
+            
+            results = list(range(1, sides+1))
+            shuffle(results)
+            if sides <= view_rolls:
+                for i in range(0, view_rolls-len(results)):
+                    results.append(randint(1, sides))
+        
+        except ValueError:
+            if ";" in args:
+                options = args.split(";")
+            elif "," in args:
+                options = args.split(",")
+            else:
+                options = args.split(" ")
+
+            results = options
+            shuffle(results)
+            if len(options) <= view_rolls:
+                for i in range(0, view_rolls-len(options)):
+                    results.append(options[randint(0, len(options)-1)])
 
         msg = await ctx.send(
             f":game_die: {results[0]} :game_die:"

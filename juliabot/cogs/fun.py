@@ -1,7 +1,8 @@
 from typing import Optional
 from discord.ext import commands
 from discord import User
-from random import randint
+from random import randint, shuffle
+import time
 
 
 from ..scripts import Script
@@ -64,12 +65,30 @@ class Fun(commands.Cog, name="fun"):
         scr = Script(f"duel_{ctx.guild.id}", "duel")
         await scr.execute(message=ctx.message)
 
-    @commands.command(name="dice", brief="Role um dado.", aliases=["dado", "d"])
+    @commands.command(name="dice", brief="Role um dado.", aliases=["dado", "d", "roll"])
     async def dice(self, ctx: commands.Context, sides: Optional[int] = 6):
-        result = randint(1, sides)
-        await ctx.send(
-            f":game_die: {ctx.author.mention} rolou um dado e tirou `{result}`! :game_die:"
+        view_rolls = 3
+        if sides < 2:
+            await ctx.send("O dado precisa ter mais de 1 lado!")
+            return
+        
+        results = list(range(1, sides+1))
+        shuffle(results)
+        if sides <= view_rolls:
+            for i in range(0, view_rolls-len(results)):
+                results.append(randint(1, sides))
+
+
+        msg = await ctx.send(
+            f":game_die: {results[0]} :game_die:"
         )
+        time
+        for i in range(1, view_rolls):
+            time.sleep(0.5)
+            await msg.edit(content=f":game_die: {results[i]} :game_die:")
+        
+        time.sleep(0.5)
+        await msg.edit(content=f"Resultado: {results[-1]} :game_die:")
 
 
 def setup(bot: commands.Bot):

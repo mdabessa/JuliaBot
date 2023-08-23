@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 from sqlalchemy import Column, String, Integer, DateTime, Boolean, and_, create_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -141,7 +141,8 @@ class Reminder(Model):
 
     @classmethod
     def get_expired(cls) -> List[Reminder]:
-        return session.query(cls).filter(cls.time_reminder <= datetime.now()).all()
+        now = datetime.now() + timedelta(minutes=1)
+        return session.query(cls).filter(cls.time_reminder <= now).all()
 
     @classmethod
     def get_all(cls, user_id: str) -> List[Reminder]:

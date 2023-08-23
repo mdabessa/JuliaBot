@@ -93,7 +93,7 @@ class _Reminder(commands.Cog, name="reminder"):
         brief="Irei te notificar no dia desejado, relembrando sua mensagem!",
         aliases=["rm", "lembrete", "remind"],
     )
-    async def remember_me(self, ctx: commands.Context, date: Union[Date, DeltaToDate, NextDate]):
+    async def remind_me(self, ctx: commands.Context, date: Union[Date, DeltaToDate, NextDate]):
         Reminder(ctx.channel.id, ctx.message.id, ctx.author.id, date)
         await ctx.reply(
             f'OK, Eu irei te notificar no dia `{date.strftime("%d/%m/%Y %H:%M")}`!'
@@ -103,7 +103,7 @@ class _Reminder(commands.Cog, name="reminder"):
         brief="Irei te notificar todos os tempos do padrão, relembrando sua mensagem!",
         aliases=["rml", "lembretel", "remindloop"],
     )
-    async def remember_me_loop(self, ctx: commands.Context, arg: str):
+    async def remind_me_loop(self, ctx: commands.Context, arg: str):
         converters = [DeltaToDate, NextDate]
         for converter in converters:
             try:
@@ -149,9 +149,11 @@ class _Reminder(commands.Cog, name="reminder"):
                 for user in message.mentions:
                     text += f" {user.mention}"
 
-                await message.reply(
+                m = await message.reply(
                     "Aqui esta a mensagem que você me pediu para te lembrar!" + text
                 )
+
+                await m.add_reaction("👍")
 
             except:
                 user = await self.bot.fetch_user(int(_reminder.user_id))

@@ -141,7 +141,8 @@ class Reminder(Model):
 
     @classmethod
     def get_expired(cls) -> List[Reminder]:
-        now = datetime.now() + timedelta(minutes=1)
+        now = datetime.now()
+        now = now.replace(second=59, microsecond=999999)
         return session.query(cls).filter(cls.time_reminder <= now).all()
 
     @classmethod

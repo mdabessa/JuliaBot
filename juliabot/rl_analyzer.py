@@ -29,7 +29,7 @@ RANKS = [
 
 def replay_analyzer(replay_id: str, token: str) -> requests.Response:
     return requests.get(
-        f"https://rl-analyzer.herokuapp.com/replay/{replay_id}",
+        f"https://rocketleague-analyzer-93acc7980de0.herokuapp.com/replay/{replay_id}",
         headers={"Authorization": token},
     )
 

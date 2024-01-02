@@ -60,6 +60,11 @@ class RLAnalyzer(commands.Cog, name="rlanalyzer"):
             players = []
             for team in ["orange", "blue"]:
                 for player in replay[team]["players"]:
+                    tier = replay['min_rank']['tier'] if 'min_rank' in replay \
+                        else replay['max_rank']['tier']
+
+                    player['team'] = team
+                    player['tier'] = tier
                     players.append(player)
 
             player = players[0]
@@ -186,10 +191,17 @@ class RLAnalyzer(commands.Cog, name="rlanalyzer"):
 
         msg = await ctx.send(f"Pesquisando ultimo replay de `{player}`...")
 
-        replay = query_replays(
+        replays = query_replays(
             query={"player-name": player}, token=user.ballchasing_token
-        ).json()["list"][0]
+        ).json()["list"]
+
         await sleep(2)
+        
+        if len(replays) == 0:
+            await ctx.send(f"Não foi encontrado nenhum replay de `{player}`.")
+            return
+        
+        replay = replays[0]
 
         response = replay_analyzer(replay["id"], user.ballchasing_token)
         await msg.delete()

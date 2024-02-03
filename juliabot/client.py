@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from discord.ext.commands import Bot
+from discord.ext import commands
 from discord import Game, Message
 from .models import init_db
 
@@ -23,8 +24,13 @@ class Client(Bot):
         print("Pronto!")
 
     async def on_message(self, message: Message):
-        ctx = await self.get_context(message)
-        if ctx.command is not None:
-            print(f"{message.author} -> {message.content}")
+        # ctx = await self.get_context(message)
+        # if ctx.command is not None:
+        #     print(f"{message.author} -> {message.content}")
 
         await self.process_commands(message)
+
+
+    async def on_command_error(self, ctx: commands.Context, error):
+        print(error)
+        await ctx.send(error)

@@ -29,8 +29,3 @@ class Client(Bot):
         #     print(f"{message.author} -> {message.content}")
 
         await self.process_commands(message)
-
-
-    async def on_command_error(self, ctx: commands.Context, error):
-        print(error)
-        await ctx.send(error)

@@ -1,3 +1,4 @@
+import traceback
 from discord.ext import commands
 
 
@@ -8,17 +9,31 @@ class ErrorHandler(commands.Cog):
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CommandNotFound):
+            await ctx.send("Comando não encontrado.")
             return
-        elif isinstance(error, commands.MissingRequiredArgument):
+        
+        if isinstance(error, commands.MissingRequiredArgument):
             await ctx.send(f"Parametro requerido faltando: {error.param.name}")
-        elif isinstance(error, commands.MissingPermissions):
+            return
+        
+        if isinstance(error, commands.MissingPermissions):
             await ctx.send("Você não tem permissão para usar esse comando.")
-        elif isinstance(error, commands.BotMissingPermissions):
+            return
+    
+        if isinstance(error, commands.BotMissingPermissions):
             await ctx.send("Eu não tenho permissão para fazer isso.")
-        elif isinstance(error, commands.NotOwner):
+            return
+        
+        if isinstance(error, commands.NotOwner):
             await ctx.send("Somente o dono do bot pode usar esse comando.")
-        else:
-            raise error
+            return
+        
+        if isinstance(error, commands.CommandOnCooldown):
+            await ctx.send(f"Esse comando está em cooldown. Tente novamente em {error.retry_after:.2f} segundos.")
+            return
+        
+        await ctx.send(f"Erro: {error}")
+        traceback.print_exception(type(error), error, error.__traceback__)
 
 
 def setup(bot):

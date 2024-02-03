@@ -1,7 +1,7 @@
 import traceback
 from discord.ext import commands
 from sqlalchemy.exc import PendingRollbackError
-from models import rollback
+from ..models import rollback
 
 
 class ErrorHandler(commands.Cog):

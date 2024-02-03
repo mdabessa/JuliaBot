@@ -274,3 +274,7 @@ class RocketLeague(Model):
 
 def init_db():
     Model.metadata.create_all(engine)
+
+
+def rollback():
+    session.rollback()

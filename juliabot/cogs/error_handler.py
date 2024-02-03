@@ -1,5 +1,7 @@
 import traceback
 from discord.ext import commands
+from sqlalchemy.exc import PendingRollbackError
+from models import rollback
 
 
 class ErrorHandler(commands.Cog):
@@ -32,6 +34,11 @@ class ErrorHandler(commands.Cog):
             await ctx.send(f"Esse comando está em cooldown. Tente novamente em {error.retry_after:.2f} segundos.")
             return
         
+        if isinstance(error, PendingRollbackError):
+            await ctx.send("Erro ao salvar no banco de dados, tente novamente.")
+            rollback()
+            return
+
         await ctx.send(f"Erro: {error}")
         traceback.print_exception(type(error), error, error.__traceback__)
 

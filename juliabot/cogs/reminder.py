@@ -1,6 +1,7 @@
 from typing import Union
 from discord import Embed
 from discord.ext import commands, tasks
+from datetime import timedelta
 
 from ..models import Reminder
 from ..converters import Date, DeltaToDate, NextDate
@@ -49,8 +50,10 @@ class _Reminder(commands.Cog, name="reminder"):
             elif kwargs["emoji"] == "❌" and kwargs["user"].id == int(reminder.user_id):
                 cache["reminders"].remove(reminder)
                 reminder.delete()
+                time_reminder = reminder.time_reminder
+                time_reminder = time_reminder - timedelta(hours=3)
                 await cache["message"].channel.send(
-                    f'Lembrete de `{reminder.time_reminder.strftime("%d/%m/%Y %H:%M")}` deletado com sucesso!'
+                    f'Lembrete de `{time_reminder.strftime("%d/%m/%Y %H:%M")}` deletado com sucesso!'
                 )
 
             if index < 0:
@@ -95,6 +98,8 @@ class _Reminder(commands.Cog, name="reminder"):
     )
     async def remind_me(self, ctx: commands.Context, date: Union[Date, DeltaToDate, NextDate]):
         Reminder(ctx.channel.id, ctx.message.id, ctx.author.id, date)
+
+        date = date - timedelta(hours=3)
         await ctx.reply(
             f'OK, Eu irei te notificar no dia `{date.strftime("%d/%m/%Y %H:%M")}`!'
         )
@@ -114,6 +119,7 @@ class _Reminder(commands.Cog, name="reminder"):
                     return await ctx.reply("Por favor, use um formato de data válido!")
         
         Reminder(ctx.channel.id, ctx.message.id, ctx.author.id, date, arg)
+        date = date - timedelta(hours=3)
         await ctx.reply(
             f'OK, Eu irei te notificar dia `{date.strftime("%d/%m/%Y %H:%M")}`'
         )
@@ -142,7 +148,9 @@ class _Reminder(commands.Cog, name="reminder"):
 
                     _reminder.time_reminder = new_date
                     _reminder.update()
-                    text += f" (Irei te lembrar novamente dia `{new_date.strftime('%d/%m/%Y %H:%M')}`)"
+                    time_reminder = _reminder.time_reminder
+                    time_reminder = time_reminder - timedelta(hours=3)
+                    text += f" (Irei te lembrar novamente dia `{time_reminder.strftime('%d/%m/%Y %H:%M')}`)"
                 else:
                     _reminder.delete()
 

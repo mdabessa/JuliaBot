@@ -90,7 +90,7 @@ class DeltaToDate(commands.Converter):
                 time += num * 86400
             elif step in steps["week"]:
                 time += num * 604800
-            elif step in steps["mounth"]:
+            elif step in steps["month"]:
                 time += num * 2592000
             elif step in steps["year"]:
                 time += num * 31536000

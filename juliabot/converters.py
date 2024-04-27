@@ -125,6 +125,7 @@ class NextDate(commands.Converter):
         }
     
         results = split_word(argument)
+        hour_append = False
         for res in results:
             step = None
             for key, value in steps.items():
@@ -134,6 +135,9 @@ class NextDate(commands.Converter):
             
             if not step:
                 continue
+            
+            if step == 'hour': 
+                hour_append = True
 
             num = res[0]
             date += relativedelta(**{step:num})
@@ -145,5 +149,8 @@ class NextDate(commands.Converter):
 
                 next_step = list(steps.keys())[index + 1]
                 date += relativedelta(**{next_step+'s':1})
+
+        if hour_append:
+            date = date + datetime.timedelta(hours=3) # FIXME: UTC+3 Hardcoded
 
         return date

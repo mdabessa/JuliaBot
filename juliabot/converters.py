@@ -142,7 +142,7 @@ class NextDate(commands.Converter):
             num = res[0]
             date += relativedelta(**{step:num})
 
-            if date < (datetime.datetime.now()  + datetime.timedelta(hours=3)): # FIXME: UTC+3 Hardcoded
+            if date < (datetime.datetime.now() - datetime.timedelta(hours=3)): # FIXME: UTC+3 Hardcoded
                 index = list(steps.keys()).index(step)
                 if index + 1 == len(steps):
                     raise Exception("O ano não pode ser menor que o ano atual.")

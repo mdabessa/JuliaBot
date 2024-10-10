@@ -3,8 +3,8 @@ from time import time
 from discord.ext import commands, tasks
 from discord import Message, User, Reaction
 
-
 from ..scripts import Script
+from ..models import BotConfig
 
 
 class Core(commands.Cog, name="core"):
@@ -52,6 +52,7 @@ class Core(commands.Cog, name="core"):
     @commands.Cog.listener()
     async def on_ready(self):
         self.scripts_time_out.start()
+        self.update_hearbeat.start()
 
     @commands.Cog.listener()
     async def on_message(self, message: Message):
@@ -77,6 +78,11 @@ class Core(commands.Cog, name="core"):
             diff = now - script.last_execute
             if diff.total_seconds() >= script.time_out:
                 script.close()
+
+    @tasks.loop(seconds=60)
+    async def update_hearbeat(self):
+        now = datetime.now()
+        BotConfig("heartbeat", now.strftime("%d/%m/%Y %H:%M:%S"))
 
 
 def setup(bot: commands.Bot):

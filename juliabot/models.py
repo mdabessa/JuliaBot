@@ -272,6 +272,24 @@ class RocketLeague(Model):
         return cls.select_one(key="user_id", value=str(user_id))
 
 
+class BotConfig(Model):
+    __tablename__ = "bot_config"
+
+    key = Column(String, primary_key=True)
+    value = Column(String)
+
+    def __init__(self, key: str, value: str) -> None:
+        super().__init__(key=str(key), value=str(value))
+
+    @classmethod
+    def get(cls, key: str) -> BotConfig | None:
+        return cls.select_one("key", key)
+
+    @classmethod
+    def get_all(cls) -> List[BotConfig]:
+        return cls.select_all()
+
+
 def init_db():
     Model.metadata.create_all(engine)
 

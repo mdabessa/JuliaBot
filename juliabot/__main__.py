@@ -30,4 +30,5 @@ finally:
     if heartbeat is not None:
         heartbeat.delete()
 
-raise error
+if error is not None:
+    raise error

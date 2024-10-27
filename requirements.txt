@@ -6,3 +6,4 @@ beautifulsoup4==4.9.*
 jikan4==0.2.*
 deep-translator==1.9.*
 python-dateutil==2.8.*
+heroku3==5.2.*

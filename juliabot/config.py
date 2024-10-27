@@ -42,6 +42,10 @@ try:
 except KeyError:
     SCRAP_JIKAN_RATE_LIMIT = 10
 
+try:
+    HEROKU_API_TOKEN = environ["HEROKU_API_TOKEN"]
+except KeyError:
+    HEROKU_API_TOKEN = None
 
 try:
     time.tzset()

@@ -24,8 +24,8 @@ class Client(Bot):
         print("Pronto!")
 
     async def on_message(self, message: Message):
-        # ctx = await self.get_context(message)
-        # if ctx.command is not None:
-        #     print(f"{message.author} -> {message.content}")
+        ctx = await self.get_context(message)
+        if ctx.valid:
+            print(f"Autor: {message.author} - Comando: {message.content}")
 
         await self.process_commands(message)

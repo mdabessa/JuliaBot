@@ -48,6 +48,10 @@ class Date(commands.Converter):
                 f"Não é possivel converter {argument} em um objeto datetime.datetime"
             )
 
+        now = datetime.datetime.now()
+        now = now.strftime("%d/%m/%Y-%H:%M")
+        date_ = date.strftime("%d/%m/%Y-%H:%M")
+        print(f'{now} | Date[{argument}] -> {date_}')
         return date
 
 
@@ -58,7 +62,6 @@ class DeltaToDate(commands.Converter):
         if not argument[0].isdigit():
             raise Exception(f"Não é possivel converter {argument} em DeltaToDate.")
 
-        print(argument)
         start = start or datetime.datetime.now()
         steps = {
             "minute": ["min", "minute", "minutes", "minuto", "minutos"],
@@ -105,7 +108,12 @@ class DeltaToDate(commands.Converter):
                 f"Delta não pode ser menor que 0 ou maior que {limit} segundos"
             )
 
-        return start + delta
+        date = start + delta
+        now = datetime.datetime.now()
+        now = now.strftime("%d/%m/%Y-%H:%M")
+        date_ = date.strftime("%d/%m/%Y-%H:%M")
+        print(f'{now} | DeltaToDate[{argument}] -> {date_}')
+        return date
 
 
 class NextDate(commands.Converter):
@@ -146,4 +154,8 @@ class NextDate(commands.Converter):
                 next_step = list(steps.keys())[index + 1]
                 date += relativedelta(**{next_step+'s':1})
 
+        now = datetime.datetime.now()
+        now = now.strftime("%d/%m/%Y-%H:%M")
+        date_ = date.strftime("%d/%m/%Y-%H:%M")
+        print(f'{now} | NextDate[{argument}] -> {date_}')
         return date

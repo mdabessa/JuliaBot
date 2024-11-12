@@ -1,3 +1,4 @@
+import argparse
 import datetime
 
 from .config import DISCORD_TOKEN
@@ -6,18 +7,31 @@ from .utils import get_prefix
 from .models import init_db, BotConfig
 
 
+parser = argparse.ArgumentParser(description="JuliaBot")
+parser.add_argument(
+    "-f",
+    "--force",
+    action="store_true",
+    help="Permite forçar a execução do bot mesmo que já exista uma instância ativa.",
+)
+
+args = parser.parse_args()
+
 init_db()
 
-heartbeat = BotConfig.get("heartbeat")
-now = datetime.datetime.now()
 
-if heartbeat is None:
-    BotConfig("heartbeat", now.strftime("%d/%m/%Y %H:%M:%S"))
-else:
-    date = datetime.datetime.strptime(heartbeat.value, "%d/%m/%Y %H:%M:%S")
-    if (now - date).seconds < 60 * 5:
-        print("Bot já esta ativo!")
-        exit(0)
+if not args.force:
+    heartbeat = BotConfig.get("heartbeat")
+    now = datetime.datetime.now()
+
+    if heartbeat is None:
+        BotConfig("heartbeat", now.strftime("%d/%m/%Y %H:%M:%S"))
+    else:
+        date = datetime.datetime.strptime(heartbeat.value, "%d/%m/%Y %H:%M:%S")
+        if (now - date).seconds < 60 * 5:
+            print("Bot já esta ativo!")
+            exit(0)
+
 
 error = None
 try:

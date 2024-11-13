@@ -272,6 +272,48 @@ class RocketLeague(Model):
         return cls.select_one(key="user_id", value=str(user_id))
 
 
+class TwitchNotifier(Model):
+    __tablename__ = "twitch_notifier"
+
+    streamer_id = Column(String, primary_key=True)
+    channel_id = Column(String, primary_key=True)
+    dm = Column(Boolean, nullable=False, default=False)
+    notified = Column(Boolean, nullable=False, default=True)
+
+
+    def __init__(self, streamer_id: str, channel_id: str, dm: bool = False) -> None:
+        super().__init__(
+            streamer_id=str(streamer_id), channel_id=str(channel_id), dm=bool(dm)
+        )
+    
+    @classmethod
+    def get(cls, streamer_id: str, channel_id: str) -> TwitchNotifier | None:
+        return (
+            session.query(cls)
+            .filter(
+                and_(
+                    cls.streamer_id == str(streamer_id),
+                    cls.channel_id == str(channel_id),
+                )
+            )
+            .first()
+        )
+    
+    @classmethod
+    def get_all(cls) -> List[TwitchNotifier]:
+        return cls.select_all()
+
+    @classmethod
+    def get_by_channel(cls, channel_id: str) -> List[TwitchNotifier]:
+        return session.query(cls).filter(cls.channel_id == str(channel_id)).all()
+
+    @classmethod
+    def reset(cls) -> None:
+        for i in cls.get_all():
+            i.notified = False
+            i.update()
+
+
 class BotConfig(Model):
     __tablename__ = "bot_config"
 

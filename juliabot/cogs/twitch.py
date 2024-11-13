@@ -118,6 +118,11 @@ class Twitch(commands.Cog):
                 
                 notifier.notified = True
                 notifier.update()
+            
+            else:
+                # reset notification if streamer goes offline
+                notifier.notified = False
+                notifier.update()
 
 
 def setup(bot: commands.Bot):

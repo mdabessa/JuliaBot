@@ -104,13 +104,10 @@ class Twitch(commands.Cog):
     async def check_streamers(self):
         cache = {}
         for notifier in TwitchNotifier.get_all():
-            if notifier.notified:
-                continue
-
             if notifier.streamer_id not in cache:
                 cache[notifier.streamer_id] = Twitch.is_streamer_online(notifier.streamer_id)
 
-            if cache[notifier.streamer_id]:
+            if cache[notifier.streamer_id] and not notifier.notified:
                 channel = self.bot.get_channel(int(notifier.channel_id))
                 await channel.send(
                     f"{notifier.streamer_id} está online! Assista em {Twitch.get_streamer_url(notifier.streamer_id)}."

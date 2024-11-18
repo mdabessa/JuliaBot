@@ -116,7 +116,7 @@ class Twitch(commands.Cog):
                 notifier.notified = True
                 notifier.update()
             
-            else:
+            if not cache[notifier.streamer_id]:
                 # reset notification if streamer goes offline
                 notifier.notified = False
                 notifier.update()

@@ -1,4 +1,5 @@
 import requests
+import time
 
 from discord.ext import commands, tasks
 
@@ -26,7 +27,10 @@ class Twitch(commands.Cog):
     def is_streamer_online(streamer: str) -> bool:
         url = Twitch.get_streamer_url(streamer)
         response = requests.get(url)
-        return response.status_code == 200 and 'isLiveBroadcast' in response.text
+        if response.status_code != 200:
+            raise Exception(f"Erro ao acessar {url}.")
+
+        return 'isLiveBroadcast' in response.text
     
 
     @commands.command(
@@ -106,6 +110,7 @@ class Twitch(commands.Cog):
         for notifier in TwitchNotifier.get_all():
             if notifier.streamer_id not in cache:
                 cache[notifier.streamer_id] = Twitch.is_streamer_online(notifier.streamer_id)
+                time.sleep(1)
 
             if cache[notifier.streamer_id] and not notifier.notified:
                 channel = self.bot.get_channel(int(notifier.channel_id))

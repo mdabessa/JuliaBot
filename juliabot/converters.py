@@ -109,10 +109,9 @@ class DeltaToDate(commands.Converter):
             )
 
         date = start + delta
-        now = datetime.datetime.now()
-        now = now.strftime("%d/%m/%Y-%H:%M")
+        start = start.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")
-        print(f'{now} | DeltaToDate[{argument}] -> {date_}')
+        print(f'{start} | DeltaToDate[{argument}] -> {date_}')
         return date
 
 

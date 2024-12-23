@@ -102,7 +102,6 @@ class DeltaToDate(commands.Converter):
             times[step] = True
             date += relativedelta(**{step + "s": num})
 
-        
         now = start.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")
         print(f"{now} | DeltaToDate[{argument}] -> {date_}")
@@ -143,8 +142,6 @@ class NextDate(commands.Converter):
                 raise Exception(f"O tempo {step} não pode ser calculado.")
 
             times[step] = (res[0], False)
-
-        print(times)
 
         for step, (num, _) in times.items():
             date += relativedelta(**{step: num})

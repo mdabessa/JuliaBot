@@ -72,7 +72,8 @@ class DeltaToDate(commands.Converter):
         if not argument[0].isdigit():
             raise Exception(f"Não é possivel converter {argument} em DeltaToDate.")
 
-        date = start or datetime.datetime.now()
+        start = start or datetime.datetime.now()
+        date = start
 
         times = {
             "year": False,
@@ -101,6 +102,7 @@ class DeltaToDate(commands.Converter):
             times[step] = True
             date += relativedelta(**{step + "s": num})
 
+        
         now = start.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")
         print(f"{now} | DeltaToDate[{argument}] -> {date_}")
@@ -114,7 +116,8 @@ class NextDate(commands.Converter):
         if argument[0].isdigit():
             raise Exception(f"Não é possivel converter {argument} em NextDate.")
 
-        date = start or datetime.datetime.now()
+        start = start or datetime.datetime.now()
+        date = start
 
         times = {
             "year": (start.year, True),

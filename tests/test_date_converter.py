@@ -36,9 +36,13 @@ async def test_next_date_converter():
         [
             datetime.datetime(2024, 10, 24, hour=17, minute=6),
             datetime.datetime(2024, 10, 25, hour=17, minute=0),
+            "minutos00horas17"
+        ],
+        [
+            datetime.datetime(2024, 10, 24, hour=17, minute=6),
+            datetime.datetime(2024, 10, 25, hour=17, minute=0),
             "horas17minutos00"
         ],
-
         [
             datetime.datetime(2024, 12, 20, hour=13, minute=16),
             datetime.datetime(2024, 12, 21, hour=12, minute=16),

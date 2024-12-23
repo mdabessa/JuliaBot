@@ -124,14 +124,23 @@ class NextDate(commands.Converter):
 
         date = start or datetime.datetime.now()
         steps = {
-            "minute": ["min", "minute", "minutes", "minuto", "minutos"],
+            "minute": ["m", "min", "minute", "minutes", "minuto", "minutos"],
             "hour": ["h", "hour", "hours", "hora", "horas", "hr", "hrs"],
             "day": ["d", "day", "days", "dia", "dias"],
             "month": ["month", "months", "mes", "meses", "mês"],
             "year": ["y", "year", "years", "a", "ano", "anos"],
         }
     
+        times = {
+            'year': (start.year, True),
+            'month': (start.month, True),
+            'day': (start.day, True),
+            'hour': (start.hour, True),
+            'minute': (start.minute, True),
+        }
+
         results = split_word(argument)
+
         for res in results:
             step = None
             for key, value in steps.items():
@@ -140,21 +149,33 @@ class NextDate(commands.Converter):
                     break
             
             if not step:
-                continue
+                raise Exception(f"Não é possivel converter {res[1]} em tempo.")
+            
+            times[step] = [res[0], False]
 
-            num = res[0]
+
+        print(times)
+
+        for step, (num, _) in times.items():
             date += relativedelta(**{step:num})
 
-            if date < datetime.datetime.now():
+            if date < start:
                 index = list(steps.keys()).index(step)
-                if index + 1 == len(steps):
-                    raise Exception("O ano não pode ser menor que o ano atual.")
+                
+                while True:
+                    index += 1
 
-                next_step = list(steps.keys())[index + 1]
-                date += relativedelta(**{next_step+'s':1})
+                    if index == len(steps):
+                        raise Exception("Data não pode ser menor que a data atual")
 
-        now = datetime.datetime.now()
-        now = now.strftime("%d/%m/%Y-%H:%M")
+                    if not times[list(steps.keys())[index]][1]: # if fixed go to next
+                        continue
+
+                    next_step = list(steps.keys())[index]
+                    date += relativedelta(**{next_step+'s':1})
+                    break
+
+        now = start.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")
         print(f'{now} | NextDate[{argument}] -> {date_}')
         return date

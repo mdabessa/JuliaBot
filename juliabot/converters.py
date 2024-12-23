@@ -72,9 +72,17 @@ class DeltaToDate(commands.Converter):
         if not argument[0].isdigit():
             raise Exception(f"Não é possivel converter {argument} em DeltaToDate.")
 
-        start = start or datetime.datetime.now()
+        date = start or datetime.datetime.now()
 
-        time = 0
+        times = {
+            'year': False,
+            'month': False,
+            'week': False,
+            'day': False,
+            'hour': False,
+            'minute': False
+        }
+
         results = split_word(argument, reverse=True)
         for res in results:
             num = res[0]
@@ -85,35 +93,17 @@ class DeltaToDate(commands.Converter):
                     break
             
             if not step:
-                continue
+                raise Exception(f"Não é possivel converter {res[1]} em tempo.")
 
-            if step in STEPS["minute"]:
-                time += num * 60
-            elif step in STEPS["hour"]:
-                time += num * 3600
-            elif step in STEPS["day"]:
-                time += num * 86400
-            elif step in STEPS["week"]:
-                time += num * 604800
-            elif step in STEPS["month"]:
-                time += num * 2592000
-            elif step in STEPS["year"]:
-                time += num * 31536000
-            else:
-                raise Exception(f"Não é possivel converter {step} em tempo.")
+            if step not in times:
+                raise Exception(f"O tempo {step} não pode ser calculado.")
 
-        delta = datetime.timedelta(seconds=time)
+            times[step] = True
+            date += relativedelta(**{step+'s':num})
 
-        limit = 3153600000  # 100 years
-        if (time <= 0) or (time > limit):
-            raise Exception(
-                f"Delta não pode ser menor que 0 ou maior que {limit} segundos"
-            )
-
-        date = start + delta
-        start = start.strftime("%d/%m/%Y-%H:%M")
+        now = start.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")
-        print(f'{start} | DeltaToDate[{argument}] -> {date_}')
+        print(f'{now} | DeltaToDate[{argument}] -> {date_}')
         return date
 
 

@@ -146,6 +146,9 @@ class NextDate(commands.Converter):
             
             if not step:
                 raise Exception(f"Não é possivel converter {res[1]} em tempo.")
+
+            if step not in times:
+                raise Exception(f"O tempo {step} não pode ser calculado.")    
             
             times[step] = [res[0], False]
 

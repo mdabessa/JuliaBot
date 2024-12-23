@@ -4,7 +4,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import pytest
 import datetime
-from itertools import product
 
 from juliabot.converters import Date, DeltaToDate, NextDate
 

@@ -4,6 +4,16 @@ from dateutil.relativedelta import relativedelta
 import re
 
 
+STEPS = {
+    "minute": ["m", "min", "minute", "minutes", "minuto", "minutos"],
+    "hour": ["h", "hour", "hours", "hora", "horas", "hr", "hrs"],
+    "day": ["d", "day", "days", "dia", "dias"],
+    "week": ["w", "week", "weeks", "semana", "semanas"],
+    "month": ["month", "months", "mes", "meses", "mês"],
+    "year": ["y", "year", "years", "a", "ano", "anos"],
+}
+
+
 def split_word(word, reverse=False):
     if reverse:
         regex = r'(\d+)([a-zA-Z]*)'
@@ -63,21 +73,13 @@ class DeltaToDate(commands.Converter):
             raise Exception(f"Não é possivel converter {argument} em DeltaToDate.")
 
         start = start or datetime.datetime.now()
-        steps = {
-            "minute": ["min", "minute", "minutes", "minuto", "minutos"],
-            "hour": ["h", "hour", "hours", "hora", "horas", "hr", "hrs"],
-            "day": ["d", "day", "days", "dia", "dias"],
-            "week": ["w", "week", "weeks", "semana", "semanas"],
-            "month": ["month", "months", "mes", "meses", "mês"],
-            "year": ["y", "year", "years", "a", "ano", "anos"],
-        }
 
         time = 0
         results = split_word(argument, reverse=True)
         for res in results:
             num = res[0]
             step = None
-            for key, value in steps.items():
+            for key, value in STEPS.items():
                 if res[1] in value:
                     step = key
                     break
@@ -85,17 +87,17 @@ class DeltaToDate(commands.Converter):
             if not step:
                 continue
 
-            if step in steps["minute"]:
+            if step in STEPS["minute"]:
                 time += num * 60
-            elif step in steps["hour"]:
+            elif step in STEPS["hour"]:
                 time += num * 3600
-            elif step in steps["day"]:
+            elif step in STEPS["day"]:
                 time += num * 86400
-            elif step in steps["week"]:
+            elif step in STEPS["week"]:
                 time += num * 604800
-            elif step in steps["month"]:
+            elif step in STEPS["month"]:
                 time += num * 2592000
-            elif step in steps["year"]:
+            elif step in STEPS["year"]:
                 time += num * 31536000
             else:
                 raise Exception(f"Não é possivel converter {step} em tempo.")
@@ -123,13 +125,7 @@ class NextDate(commands.Converter):
             raise Exception(f"Não é possivel converter {argument} em NextDate.")
 
         date = start or datetime.datetime.now()
-        steps = {
-            "minute": ["m", "min", "minute", "minutes", "minuto", "minutos"],
-            "hour": ["h", "hour", "hours", "hora", "horas", "hr", "hrs"],
-            "day": ["d", "day", "days", "dia", "dias"],
-            "month": ["month", "months", "mes", "meses", "mês"],
-            "year": ["y", "year", "years", "a", "ano", "anos"],
-        }
+
     
         times = {
             'year': (start.year, True),
@@ -143,7 +139,7 @@ class NextDate(commands.Converter):
 
         for res in results:
             step = None
-            for key, value in steps.items():
+            for key, value in STEPS.items():
                 if res[1] in value:
                     step = key
                     break
@@ -160,18 +156,18 @@ class NextDate(commands.Converter):
             date += relativedelta(**{step:num})
 
             if date < start:
-                index = list(steps.keys()).index(step)
+                index = list(STEPS.keys()).index(step)
                 
                 while True:
                     index += 1
 
-                    if index == len(steps):
+                    if index == len(STEPS):
                         raise Exception("Data não pode ser menor que a data atual")
 
-                    if not times[list(steps.keys())[index]][1]: # if fixed go to next
+                    if not times[list(STEPS.keys())[index]][1]: # if fixed go to next
                         continue
 
-                    next_step = list(steps.keys())[index]
+                    next_step = list(STEPS.keys())[index]
                     date += relativedelta(**{next_step+'s':1})
                     break
 

@@ -280,12 +280,11 @@ class TwitchNotifier(Model):
     dm = Column(Boolean, nullable=False, default=False)
     notified = Column(Boolean, nullable=False, default=True)
 
-
     def __init__(self, streamer_id: str, channel_id: str, dm: bool = False) -> None:
         super().__init__(
             streamer_id=str(streamer_id), channel_id=str(channel_id), dm=bool(dm)
         )
-    
+
     @classmethod
     def get(cls, streamer_id: str, channel_id: str) -> TwitchNotifier | None:
         return (
@@ -298,7 +297,7 @@ class TwitchNotifier(Model):
             )
             .first()
         )
-    
+
     @classmethod
     def get_all(cls) -> List[TwitchNotifier]:
         return cls.select_all()

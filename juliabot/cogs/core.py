@@ -82,13 +82,14 @@ class Core(commands.Cog, name="core"):
     @tasks.loop(seconds=60)
     async def update_hearbeat(self):
         now = datetime.now()
-        
+
         heartbeat = BotConfig.get("heartbeat")
         if heartbeat is None:
             BotConfig("heartbeat", now.strftime("%d/%m/%Y %H:%M:%S"))
         else:
             heartbeat.value = now.strftime("%d/%m/%Y %H:%M:%S")
-            heartbeat.update()    
+            heartbeat.update()
+
 
 def setup(bot: commands.Bot):
     bot.add_cog(Core(bot))

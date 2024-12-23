@@ -13,27 +13,29 @@ class ErrorHandler(commands.Cog):
         if isinstance(error, commands.CommandNotFound):
             await ctx.send("Comando não encontrado.")
             return
-        
+
         if isinstance(error, commands.MissingRequiredArgument):
             await ctx.send(f"Parametro requerido faltando: {error.param.name}")
             return
-        
+
         if isinstance(error, commands.MissingPermissions):
             await ctx.send("Você não tem permissão para usar esse comando.")
             return
-    
+
         if isinstance(error, commands.BotMissingPermissions):
             await ctx.send("Eu não tenho permissão para fazer isso.")
             return
-        
+
         if isinstance(error, commands.NotOwner):
             await ctx.send("Somente o dono do bot pode usar esse comando.")
             return
-        
+
         if isinstance(error, commands.CommandOnCooldown):
-            await ctx.send(f"Esse comando está em cooldown. Tente novamente em {error.retry_after:.2f} segundos.")
+            await ctx.send(
+                f"Esse comando está em cooldown. Tente novamente em {error.retry_after:.2f} segundos."
+            )
             return
-        
+
         if isinstance(error, PendingRollbackError):
             await ctx.send("Erro ao salvar no banco de dados, tente novamente.")
             rollback()

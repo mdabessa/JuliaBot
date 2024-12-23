@@ -16,10 +16,10 @@ STEPS = {
 
 def split_word(word, reverse=False):
     if reverse:
-        regex = r'(\d+)([a-zA-Z]*)'
+        regex = r"(\d+)([a-zA-Z]*)"
     else:
-        regex = r'([a-zA-Z]+)(\d+)'
-        
+        regex = r"([a-zA-Z]+)(\d+)"
+
     matches = re.findall(regex, word)
     result = []
     for match in matches:
@@ -61,7 +61,7 @@ class Date(commands.Converter):
         now = datetime.datetime.now()
         now = now.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")
-        print(f'{now} | Date[{argument}] -> {date_}')
+        print(f"{now} | Date[{argument}] -> {date_}")
         return date
 
 
@@ -75,12 +75,12 @@ class DeltaToDate(commands.Converter):
         date = start or datetime.datetime.now()
 
         times = {
-            'year': False,
-            'month': False,
-            'week': False,
-            'day': False,
-            'hour': False,
-            'minute': False
+            "year": False,
+            "month": False,
+            "week": False,
+            "day": False,
+            "hour": False,
+            "minute": False,
         }
 
         results = split_word(argument, reverse=True)
@@ -91,7 +91,7 @@ class DeltaToDate(commands.Converter):
                 if res[1] in value:
                     step = key
                     break
-            
+
             if not step:
                 raise Exception(f"Não é possivel converter {res[1]} em tempo.")
 
@@ -99,11 +99,11 @@ class DeltaToDate(commands.Converter):
                 raise Exception(f"O tempo {step} não pode ser calculado.")
 
             times[step] = True
-            date += relativedelta(**{step+'s':num})
+            date += relativedelta(**{step + "s": num})
 
         now = start.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")
-        print(f'{now} | DeltaToDate[{argument}] -> {date_}')
+        print(f"{now} | DeltaToDate[{argument}] -> {date_}")
         return date
 
 
@@ -116,13 +116,12 @@ class NextDate(commands.Converter):
 
         date = start or datetime.datetime.now()
 
-    
         times = {
-            'year': (start.year, True),
-            'month': (start.month, True),
-            'day': (start.day, True),
-            'hour': (start.hour, True),
-            'minute': (start.minute, True),
+            "year": (start.year, True),
+            "month": (start.month, True),
+            "day": (start.day, True),
+            "hour": (start.hour, True),
+            "minute": (start.minute, True),
         }
 
         results = split_word(argument)
@@ -133,38 +132,37 @@ class NextDate(commands.Converter):
                 if res[1] in value:
                     step = key
                     break
-            
+
             if not step:
                 raise Exception(f"Não é possivel converter {res[1]} em tempo.")
 
             if step not in times:
-                raise Exception(f"O tempo {step} não pode ser calculado.")    
-            
-            times[step] = [res[0], False]
+                raise Exception(f"O tempo {step} não pode ser calculado.")
 
+            times[step] = (res[0], False)
 
         print(times)
 
         for step, (num, _) in times.items():
-            date += relativedelta(**{step:num})
+            date += relativedelta(**{step: num})
 
             if date < start:
                 index = list(STEPS.keys()).index(step)
-                
+
                 while True:
                     index += 1
 
                     if index == len(STEPS):
                         raise Exception("Data não pode ser menor que a data atual")
 
-                    if not times[list(STEPS.keys())[index]][1]: # if fixed go to next
+                    if not times[list(STEPS.keys())[index]][1]:  # if fixed go to next
                         continue
 
                     next_step = list(STEPS.keys())[index]
-                    date += relativedelta(**{next_step+'s':1})
+                    date += relativedelta(**{next_step + "s": 1})
                     break
 
         now = start.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")
-        print(f'{now} | NextDate[{argument}] -> {date_}')
+        print(f"{now} | NextDate[{argument}] -> {date_}")
         return date

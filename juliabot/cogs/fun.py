@@ -76,13 +76,13 @@ class Fun(commands.Cog, name="fun"):
             if sides < 2:
                 await ctx.send("O dado precisa ter mais de 1 lado!")
                 return
-            
-            results = list(range(1, sides+1))
+
+            results = list(range(1, sides + 1))
             shuffle(results)
             if sides <= view_rolls:
-                for i in range(0, view_rolls-len(results)):
+                for i in range(0, view_rolls - len(results)):
                     results.append(randint(1, sides))
-        
+
         except ValueError:
             if ";" in args:
                 options = args.split(";")
@@ -94,17 +94,15 @@ class Fun(commands.Cog, name="fun"):
             results = options
             shuffle(results)
             if len(options) <= view_rolls:
-                for i in range(0, view_rolls-len(options)):
-                    results.append(options[randint(0, len(options)-1)])
+                for i in range(0, view_rolls - len(options)):
+                    results.append(options[randint(0, len(options) - 1)])
 
-        msg = await ctx.send(
-            f":game_die: {results[0]} :game_die:"
-        )
+        msg = await ctx.send(f":game_die: {results[0]} :game_die:")
         time
         for i in range(1, view_rolls):
             time.sleep(0.5)
             await msg.edit(content=f":game_die: {results[i]} :game_die:")
-        
+
         time.sleep(0.5)
         await msg.edit(content=f"Resultado: {results[-1]} :game_die:")
 

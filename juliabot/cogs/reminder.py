@@ -93,7 +93,9 @@ class _Reminder(commands.Cog, name="reminder"):
         brief="Irei te notificar no dia desejado, relembrando sua mensagem!",
         aliases=["rm", "lembrete", "remind"],
     )
-    async def remind_me(self, ctx: commands.Context, date: Union[Date, DeltaToDate, NextDate]):
+    async def remind_me(
+        self, ctx: commands.Context, date: Union[Date, DeltaToDate, NextDate]
+    ):
         Reminder(ctx.channel.id, ctx.message.id, ctx.author.id, date)
         await ctx.reply(
             f'OK, Eu irei te notificar no dia `{date.strftime("%d/%m/%Y %H:%M")}`!'
@@ -112,7 +114,7 @@ class _Reminder(commands.Cog, name="reminder"):
             except Exception:
                 if converter == converters[-1]:
                     return await ctx.reply("Por favor, use um formato de data válido!")
-        
+
         Reminder(ctx.channel.id, ctx.message.id, ctx.author.id, date, arg)
         await ctx.reply(
             f'OK, Eu irei te notificar dia `{date.strftime("%d/%m/%Y %H:%M")}`'
@@ -133,7 +135,9 @@ class _Reminder(commands.Cog, name="reminder"):
                 if _reminder.date_command:
                     for converter in converters:
                         try:
-                            new_date = await converter.convert(None, message, _reminder.date_command)
+                            new_date = await converter.convert(
+                                None, message, _reminder.date_command
+                            )
                             break
                         except Exception:
                             if converter == converters[-1]:

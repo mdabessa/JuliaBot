@@ -18,11 +18,10 @@ class Twitch(commands.Cog):
     async def on_ready(self):
         self.check_streamers.start()
 
-
     @staticmethod
     def get_streamer_url(streamer: str) -> str:
         return f"https://www.twitch.tv/{streamer}"
-    
+
     @staticmethod
     def is_streamer_online(streamer: str) -> bool:
         url = Twitch.get_streamer_url(streamer)
@@ -30,8 +29,7 @@ class Twitch(commands.Cog):
         if response.status_code != 200:
             raise Exception(f"Erro ao acessar {url}.")
 
-        return 'isLiveBroadcast' in response.text
-    
+        return "isLiveBroadcast" in response.text
 
     @commands.command(
         name="stream",
@@ -53,7 +51,9 @@ class Twitch(commands.Cog):
     )
     async def add_streamer(self, ctx: commands.Context, streamer: str):
         if TwitchNotifier.get(streamer, str(ctx.channel.id)) is not None:
-            await ctx.send(f"O canal atual já está recebendo notificações de `{streamer}`.")
+            await ctx.send(
+                f"O canal atual já está recebendo notificações de `{streamer}`."
+            )
             return
 
         TwitchNotifier(streamer, str(ctx.channel.id))
@@ -73,9 +73,10 @@ class Twitch(commands.Cog):
             return
 
         notifier.delete()
-        await ctx.send(f"`{streamer}` foi removido da lista de notificação deste canal.")
+        await ctx.send(
+            f"`{streamer}` foi removido da lista de notificação deste canal."
+        )
 
-    
     @commands.command(
         name="list_streamers",
         brief="Lista os streamers que estão sendo notificados.",
@@ -92,7 +93,6 @@ class Twitch(commands.Cog):
         streamers = [f"`{streamer.streamer_id}`" for streamer in streamers]
         await ctx.send(f"Streamers notificados neste canal: {', '.join(streamers)}")
 
-
     # Debugging purposes
     @commands.command(
         name="reset_notifications",
@@ -103,13 +103,14 @@ class Twitch(commands.Cog):
         TwitchNotifier.reset()
         await ctx.send("As notificações de streamers foram resetadas.")
 
-
     @tasks.loop(minutes=5)
     async def check_streamers(self):
         cache = {}
         for notifier in TwitchNotifier.get_all():
             if notifier.streamer_id not in cache:
-                cache[notifier.streamer_id] = Twitch.is_streamer_online(notifier.streamer_id)
+                cache[notifier.streamer_id] = Twitch.is_streamer_online(
+                    notifier.streamer_id
+                )
                 time.sleep(1)
 
             if cache[notifier.streamer_id] and not notifier.notified:
@@ -117,10 +118,10 @@ class Twitch(commands.Cog):
                 await channel.send(
                     f"{notifier.streamer_id} está online! Assista em {Twitch.get_streamer_url(notifier.streamer_id)}."
                 )
-                
+
                 notifier.notified = True
                 notifier.update()
-            
+
             if not cache[notifier.streamer_id]:
                 # reset notification if streamer goes offline
                 notifier.notified = False

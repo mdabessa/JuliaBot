@@ -95,6 +95,11 @@ async def test_next_date_converter():
             datetime.datetime(2024, 12, 20, hour=13, minute=16),
             "m16",
         ],
+                [
+            datetime.datetime(2024, 12, 26, hour=8, minute=0),
+            datetime.datetime(2024, 12, 27, hour=8, minute=0),
+            "h8m00",
+        ],
     ]
 
     for test in tests:

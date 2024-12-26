@@ -146,7 +146,7 @@ class NextDate(commands.Converter):
         for step, (num, _) in times.items():
             date += relativedelta(**{step: num})
 
-            if ((date < start) or ((date == start) and (step == "minute"))):
+            if (date < start) or ((date == start) and (step == "minute")):
                 index = list(STEPS.keys()).index(step)
 
                 while True:

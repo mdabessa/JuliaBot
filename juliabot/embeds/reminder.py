@@ -1,8 +1,9 @@
 from typing import List
+
 from discord import Embed
 
-from ..models import Reminder
 from ..converters import DeltaToDate
+from ..models import Reminder
 
 
 async def reminder_embed(reminder: Reminder, bot) -> Embed:

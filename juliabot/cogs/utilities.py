@@ -1,8 +1,8 @@
 import os
 
+from deep_translator import GoogleTranslator
 from discord import File
 from discord.ext import commands, tasks
-from deep_translator import GoogleTranslator
 
 from ..converters import Date
 

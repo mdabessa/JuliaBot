@@ -1,7 +1,7 @@
-from environs import Env
-from os import environ
 import time
+from os import environ
 
+from environs import Env
 
 env = Env()
 env.read_env()

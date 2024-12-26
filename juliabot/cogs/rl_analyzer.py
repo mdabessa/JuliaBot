@@ -4,8 +4,8 @@ from typing import Optional
 from discord import Embed, File
 from discord.ext import commands
 
-from ..rl_analyzer import replay_analyzer, query_replays, RANKS
 from ..models import RocketLeague
+from ..rl_analyzer import RANKS, query_replays, replay_analyzer
 from ..scripts import Script
 
 

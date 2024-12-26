@@ -1,6 +1,5 @@
 import requests
 
-
 RANKS = [
     "bronze-1",
     "bronze-2",

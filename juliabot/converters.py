@@ -1,8 +1,8 @@
-from discord.ext import commands
 import datetime
-from dateutil.relativedelta import relativedelta
 import re
 
+from dateutil.relativedelta import relativedelta
+from discord.ext import commands
 
 STEPS = {
     "minute": ["m", "min", "minute", "minutes", "minuto", "minutos"],

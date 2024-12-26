@@ -1,8 +1,9 @@
 from pathlib import Path
 
-from discord.ext.commands import Bot
-from discord.ext import commands
 from discord import Game, Message
+from discord.ext import commands
+from discord.ext.commands import Bot
+
 from .models import init_db
 
 

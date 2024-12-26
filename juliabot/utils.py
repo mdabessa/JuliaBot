@@ -1,8 +1,8 @@
-from discord.ext.commands import Bot
 from discord import Message
+from discord.ext.commands import Bot
 
-from .models import Server
 from .config import PREFIX
+from .models import Server
 
 
 def get_prefix(bot: Bot, message: Message) -> str:

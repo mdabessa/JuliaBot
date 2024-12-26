@@ -1,4 +1,5 @@
 from typing import List
+
 from discord import Embed
 from jikan4.models import Anime
 

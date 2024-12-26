@@ -1,11 +1,10 @@
 import argparse
 import datetime
 
-from .config import DISCORD_TOKEN
 from .client import Client
+from .config import DISCORD_TOKEN
+from .models import BotConfig, init_db
 from .utils import get_prefix
-from .models import init_db, BotConfig
-
 
 parser = argparse.ArgumentParser(description="JuliaBot")
 parser.add_argument(

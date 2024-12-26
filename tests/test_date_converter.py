@@ -1,10 +1,11 @@
-import sys
 import os
+import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-import pytest
 import datetime
+
+import pytest
 
 from juliabot.converters import Date, DeltaToDate, NextDate
 

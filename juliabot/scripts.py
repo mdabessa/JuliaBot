@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-
 import datetime
-from typing import Any, Callable, List, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 
 class Script:

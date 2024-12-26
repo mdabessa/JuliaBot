@@ -1,13 +1,14 @@
-from discord import User as DUser, TextChannel
-from discord.errors import NotFound, Forbidden
-from discord.ext import commands, tasks
-
-from jikan4 import AioJikan
 from typing import Optional
+
+from discord import TextChannel
+from discord import User as DUser
+from discord.errors import Forbidden, NotFound
+from discord.ext import commands, tasks
+from jikan4 import AioJikan
 
 from ..config import BOT_JIKAN_RATE_LIMIT
 from ..embeds.anime import anime_embed, episode_embed
-from ..models import AnimesList, User, Server, AnimesNotifier
+from ..models import AnimesList, AnimesNotifier, Server, User
 from ..scripts import Script
 
 

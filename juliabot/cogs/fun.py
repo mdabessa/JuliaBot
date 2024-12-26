@@ -1,9 +1,9 @@
-from typing import Optional
-from discord.ext import commands
-from discord import User
-from random import randint, shuffle
 import time
+from random import randint, shuffle
+from typing import Optional
 
+from discord import User
+from discord.ext import commands
 
 from ..scripts import Script
 

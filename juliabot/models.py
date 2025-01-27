@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List
 
+import pytz
 from sqlalchemy import (Boolean, Column, DateTime, Integer, String, and_,
                         create_engine)
 from sqlalchemy.ext.declarative import declarative_base
@@ -85,6 +86,7 @@ class Server(Model):
     server_id = Column(String, primary_key=True)
     prefix = Column(String, default=PREFIX)
     anime_channel = Column(String)
+    timezone = Column(String, default="UTC")
 
     def __init__(self, server_id: str) -> None:
         super().__init__(server_id=str(server_id))
@@ -99,6 +101,13 @@ class Server(Model):
     def set_anime_channel(self, channel_id: str):
         self.anime_channel = str(channel_id)
         self.update()
+
+    def set_timezone(self, timezone: pytz.timezone) -> None:
+        self.timezone = str(timezone.zone)
+        self.update()
+
+    def get_timezone(self) -> pytz.timezone:
+        return pytz.timezone(self.timezone)
 
     @classmethod
     def get(cls, server_id: str) -> Server | None:
@@ -118,6 +127,7 @@ class Reminder(Model):
     __tablename__ = "reminder"
 
     id = Column(Integer, primary_key=True)
+    server_id = Column(String, nullable=False)
     channel_id = Column(String, nullable=False)
     message_id = Column(String, nullable=False)
     user_id = Column(String, nullable=False)
@@ -127,6 +137,7 @@ class Reminder(Model):
 
     def __init__(
         self,
+        server_id: str,
         channel_id: str,
         message_id: str,
         user_id: str,
@@ -134,6 +145,7 @@ class Reminder(Model):
         date_command: str = None,
     ) -> None:
         super().__init__(
+            server_id=str(server_id),
             channel_id=str(channel_id),
             message_id=str(message_id),
             user_id=str(user_id),
@@ -141,9 +153,35 @@ class Reminder(Model):
             date_command=date_command,
         )
 
+    def get_server(self) -> Server:
+        return Server.get(self.server_id)
+
+    def get_date_str(self) -> str:
+        timezone = pytz.utc
+        server = self.get_server()
+        if server:
+            timezone = server.get_timezone()
+
+        date = self.time_reminder.astimezone(timezone)
+        date = date.strftime("%d/%m/%Y %H:%M")
+
+        return date + f" [{timezone.zone}]"
+
+    def get_created_str(self) -> str:
+        timezone = pytz.utc
+        server = self.get_server()
+        if server:
+            timezone = server.get_timezone()
+
+        date = self.time_created.astimezone(timezone)
+        date = date.strftime("%d/%m/%Y %H:%M")
+
+        return date + f" [{timezone.zone}]"
+
     @classmethod
     def get_expired(cls) -> List[Reminder]:
         now = datetime.now()
+        now = now.astimezone(pytz.utc)
         now = now.replace(second=59, microsecond=999999)
         return session.query(cls).filter(cls.time_reminder <= now).all()
 

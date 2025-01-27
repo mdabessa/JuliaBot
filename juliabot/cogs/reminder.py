@@ -5,7 +5,7 @@ from discord.ext import commands, tasks
 
 from ..converters import Date, DeltaToDate, NextDate
 from ..embeds.reminder import reminder_embed
-from ..models import Reminder
+from ..models import Reminder, Server
 from ..scripts import Script
 
 
@@ -51,7 +51,7 @@ class _Reminder(commands.Cog, name="reminder"):
                 cache["reminders"].remove(reminder)
                 reminder.delete()
                 await cache["message"].channel.send(
-                    f'Lembrete de `{reminder.time_reminder.strftime("%d/%m/%Y %H:%M")}` deletado com sucesso!'
+                    f"Lembrete de `{reminder.get_date_str()}` deletado com sucesso!"
                 )
 
             if index < 0:
@@ -97,10 +97,10 @@ class _Reminder(commands.Cog, name="reminder"):
     async def remind_me(
         self, ctx: commands.Context, date: Union[Date, DeltaToDate, NextDate]
     ):
-        Reminder(ctx.channel.id, ctx.message.id, ctx.author.id, date)
-        await ctx.reply(
-            f'OK, Eu irei te notificar no dia `{date.strftime("%d/%m/%Y %H:%M")}`!'
+        reminder = Reminder(
+            ctx.guild.id, ctx.channel.id, ctx.message.id, ctx.author.id, date
         )
+        await ctx.reply(f"OK, Eu irei te notificar no dia `{reminder.get_date_str()}`!")
 
     @commands.command(
         brief="Irei te notificar todos os tempos do padrão, relembrando sua mensagem!",
@@ -116,10 +116,10 @@ class _Reminder(commands.Cog, name="reminder"):
                 if converter == converters[-1]:
                     return await ctx.reply("Por favor, use um formato de data válido!")
 
-        Reminder(ctx.channel.id, ctx.message.id, ctx.author.id, date, arg)
-        await ctx.reply(
-            f'OK, Eu irei te notificar dia `{date.strftime("%d/%m/%Y %H:%M")}`'
+        reminder = Reminder(
+            ctx.guild.id, ctx.channel.id, ctx.message.id, ctx.author.id, date, arg
         )
+        await ctx.reply(f"OK, Eu irei te notificar dia `{reminder.get_date_str()}`")
 
     @tasks.loop(seconds=20, reconnect=True)
     async def reminder(self):
@@ -147,7 +147,7 @@ class _Reminder(commands.Cog, name="reminder"):
 
                     _reminder.time_reminder = new_date
                     _reminder.update()
-                    text += f" (Irei te lembrar novamente dia `{new_date.strftime('%d/%m/%Y %H:%M')}`)"
+                    text += f" (Irei te lembrar novamente dia `{_reminder.get_date_str()}`!)"
                 else:
                     _reminder.delete()
 

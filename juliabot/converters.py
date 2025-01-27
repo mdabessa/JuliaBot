@@ -1,8 +1,11 @@
 import datetime
 import re
 
+import pytz
 from dateutil.relativedelta import relativedelta
 from discord.ext import commands
+
+from .models import Server
 
 STEPS = {
     "minute": ["m", "min", "minute", "minutes", "minuto", "minutos"],
@@ -45,10 +48,17 @@ class Date(commands.Converter):
             "%d/%m/%Y",
         ]
 
+        timezone = pytz.utc
+        if ctx:
+            if ctx.guild:
+                server = Server.get(ctx.guild.id)
+                timezone = server.get_timezone()
+
         date = None
         for f in formats:
             try:
                 date = datetime.datetime.strptime(argument, f)
+                date = timezone.localize(date)
                 break
             except:
                 continue
@@ -58,10 +68,13 @@ class Date(commands.Converter):
                 f"Não é possivel converter {argument} em um objeto datetime.datetime"
             )
 
-        now = datetime.datetime.now()
+        date = date.astimezone(pytz.utc)
+
+        now = datetime.datetime.now().astimezone(pytz.utc)
         now = now.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")
         print(f"{now} | Date[{argument}] -> {date_}")
+
         return date
 
 
@@ -73,6 +86,8 @@ class DeltaToDate(commands.Converter):
             raise Exception(f"Não é possivel converter {argument} em DeltaToDate.")
 
         start = start or datetime.datetime.now()
+        start = start.astimezone(pytz.utc)
+
         date = start
 
         times = {
@@ -105,6 +120,7 @@ class DeltaToDate(commands.Converter):
         now = start.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")
         print(f"{now} | DeltaToDate[{argument}] -> {date_}")
+
         return date
 
 
@@ -116,6 +132,14 @@ class NextDate(commands.Converter):
             raise Exception(f"Não é possivel converter {argument} em NextDate.")
 
         start = start or datetime.datetime.now()
+
+        timezone = pytz.utc
+        if ctx:
+            if ctx.guild:
+                server = Server.get(ctx.guild.id)
+                timezone = server.get_timezone()
+
+        start = start.astimezone(timezone)
         date = start
 
         times = {
@@ -161,6 +185,8 @@ class NextDate(commands.Converter):
                     next_step = list(STEPS.keys())[index]
                     date += relativedelta(**{next_step + "s": 1})
                     break
+
+        date = date.astimezone(pytz.utc)
 
         now = start.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")

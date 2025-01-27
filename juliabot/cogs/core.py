@@ -1,10 +1,11 @@
 from datetime import datetime
 from time import time
 
+import pytz
 from discord import Message, Reaction, User
 from discord.ext import commands, tasks
 
-from ..models import BotConfig
+from ..models import BotConfig, Server
 from ..scripts import Script
 
 
@@ -37,6 +38,21 @@ class Core(commands.Cog, name="core"):
     )
     async def prefix(self, ctx: commands.Context):
         await self._prefix(ctx.message)
+
+    @commands.command(
+        brief="Mostra a hora atual do servidor!",
+        aliases=["time", "hora"],
+    )
+    async def current_time(self, ctx: commands.Context):
+        timezone = pytz.utc
+        if ctx.guild:
+            server = Server.get(ctx.guild.id)
+            timezone = server.get_timezone()
+
+        now = datetime.now().astimezone(timezone)
+        now = now.strftime("%d/%m/%Y %H:%M")
+
+        await ctx.reply(f"A hora atual do servidor é: `{now} [{timezone.zone}]`")
 
     @commands.cooldown(1, 10, commands.BucketType.member)
     @commands.command(name="say", brief="Fazer o bot dizer algo.", aliases=["diga"])

@@ -4,8 +4,7 @@ from datetime import datetime
 from typing import List
 
 import pytz
-from sqlalchemy import (Boolean, Column, DateTime, Integer, String, and_,
-                        create_engine)
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, and_, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func

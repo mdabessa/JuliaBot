@@ -152,9 +152,12 @@ class NextDate(commands.Converter):
 
         results = split_word(argument)
 
+        STEPS_ = STEPS.copy()
+        del STEPS_["week"]
+
         for res in results:
             step = None
-            for key, value in STEPS.items():
+            for key, value in STEPS_.items():
                 if res[1] in value:
                     step = key
                     break
@@ -171,18 +174,18 @@ class NextDate(commands.Converter):
             date += relativedelta(**{step: num})
 
             if (date < start) or ((date == start) and (step == "minute")):
-                index = list(STEPS.keys()).index(step)
+                index = list(STEPS_.keys()).index(step)
 
                 while True:
                     index += 1
 
-                    if index == len(STEPS):
+                    if index == len(STEPS_):
                         raise Exception("Data não pode ser menor que a data atual")
 
-                    if not times[list(STEPS.keys())[index]][1]:  # if fixed go to next
+                    if not times[list(STEPS_.keys())[index]][1]:  # if fixed go to next
                         continue
 
-                    next_step = list(STEPS.keys())[index]
+                    next_step = list(STEPS_.keys())[index]
                     date += relativedelta(**{next_step + "s": 1})
                     break
 

@@ -121,6 +121,11 @@ async def test_next_date_converter():
             datetime.datetime(2024, 12, 27, hour=8, minute=0).replace(tzinfo=pytz.utc),
             "h8m00",
         ],
+        [
+            datetime.datetime(2025, 1, 30, hour=16, minute=7).replace(tzinfo=pytz.utc),
+            datetime.datetime(2025, 2, 5, hour=16, minute=7).replace(tzinfo=pytz.utc),
+            "dia5",
+        ],
     ]
 
     for test in tests:

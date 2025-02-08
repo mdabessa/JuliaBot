@@ -293,24 +293,6 @@ class AnimesList(Model):
         )
 
 
-class RocketLeague(Model):
-    __tablename__ = "rocket_league"
-
-    user_id = Column(String, primary_key=True)
-    ballchasing_token = Column(String)
-
-    def __init__(self, user_id: str) -> None:
-        super().__init__(user_id=str(user_id))
-
-    def set_ballchasing_token(self, ballchasing_token: str):
-        self.ballchasing_token = str(ballchasing_token)
-        self.update()
-
-    @classmethod
-    def get(cls, user_id: str) -> RocketLeague:
-        return cls.select_one(key="user_id", value=str(user_id))
-
-
 class TwitchNotifier(Model):
     __tablename__ = "twitch_notifier"
 

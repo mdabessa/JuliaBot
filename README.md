@@ -7,7 +7,6 @@ JuliaBot is a Discord bot written in Python using the [discord.py](https://githu
 - Subscribing to anime series to receive notifications
 - Reminder system for setting reminders
 - Translation command
-- Rocket League match analysis using the [Ballchasing API](https://ballchasing.com/doc/api)
 
 ## Installation
 1. Clone the repository

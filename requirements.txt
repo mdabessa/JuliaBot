@@ -9,3 +9,4 @@ python-dateutil==2.8.*
 heroku3==5.2.*
 requests==2.31.*
 pytz==2024.1
+google-genai==1.16.1

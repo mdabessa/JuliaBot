@@ -48,6 +48,11 @@ except KeyError:
     HEROKU_API_TOKEN = None
 
 try:
+    GENAI_API_KEY = environ["GENAI_API_KEY"]
+except KeyError:
+    GENAI_API_KEY = None
+
+try:
     time.tzset()
 except AttributeError:
     print("tzset() not available on Windows")

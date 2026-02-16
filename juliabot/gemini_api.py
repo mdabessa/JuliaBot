@@ -5,13 +5,13 @@ from .config import GENAI_API_KEY
 CLIENT = genai.Client(api_key=GENAI_API_KEY)
 
 
-def generate_response(prompt: str, model: str = "gemini-2.0-flash") -> str:
+def generate_response(prompt: str, model: str = "gemini-2.5-flash") -> str:
     """
     Generate a response from the Gemini API using the provided prompt and model.
 
     Args:
         prompt (str): The input prompt to generate a response for.
-        model (str): The model to use for generation. Default is "gemini-1.5-flash".
+        model (str): The model to use for generation. Default is "gemini-2.5-flash".
 
     Returns:
         str: The generated response.

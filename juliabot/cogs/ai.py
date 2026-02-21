@@ -75,6 +75,9 @@ def build_available_tools(bot: commands.Bot) -> list[dict]:
             continue
             
         for command in cog.get_commands():
+            if command.name in ["say"]:
+                continue
+
             description = command.description or command.brief or f"Executa o comando {command.name}"
             
             properties, required = _build_tool_properties_from_signature(command.callback)

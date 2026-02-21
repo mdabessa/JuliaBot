@@ -48,9 +48,9 @@ except KeyError:
     HEROKU_API_TOKEN = None
 
 try:
-    GENAI_API_KEY = environ["GENAI_API_KEY"]
+    DEEPSEEK_API_KEY = environ["DEEPSEEK_API_KEY"]
 except KeyError:
-    GENAI_API_KEY = None
+    DEEPSEEK_API_KEY = None
 
 try:
     time.tzset()

@@ -1,22 +1,103 @@
 import json
 import inspect
-from typing import Any
+from typing import Any, get_origin, get_args, Union
 from collections.abc import Callable
 
 from discord.ext import commands
+from discord import User, TextChannel, Member, Role, Message, Guild
 from openai import OpenAI
-from openai.types.chat import ChatCompletionMessageParam
+from openai.types.chat import ChatCompletionMessageParam, ChatCompletion
 
 from ..config import DEEPSEEK_API_KEY
 
 SYSTEM_PROMPT = """Você é um bot de Discord chamado JuliaBot.
-Pode usar emojis e formatação de texto do Discord para tornar suas respostas mais expressivas e fáceis de ler.
+Pode usar a formatação de texto do Discord e seguir o estilo de comunicação típico do ambiente, incluindo emojis, gírias, abreviações e uma linguagem mais casual.
 
-Você tem acesso a ferramentas para executar comandos do bot quando necessário. Use-as com sabedoria e apenas quando apropriado.
-Sempre forneça uma resposta amigável ao usuário, mesmo se executar um comando."""
+Você tem acesso a comandos do bot para realizar ações no servidor, como enviar mensagens, gerenciar usuários, etc.
+"""
 
 CHARACTER_LIMIT = 2000
 MESSAGE_HISTORY_LIMIT = 30
+
+
+def _get_param_type_and_description(annotation: Any) -> tuple[str, str]:
+    """Detecta o tipo JSON Schema e descrição para uma anotação Python complexa.
+    
+    Args:
+        annotation: Anotação de tipo Python (pode ser complexa)
+        
+    Returns:
+        (tipo_json_schema, descrição)
+    """
+    type_mapping = {
+        User: ("string", "ID ou menção de um usuário Discord"),
+        Member: ("string", "ID ou menção de um membro do servidor"),
+        TextChannel: ("string", "ID ou menção de um canal de texto"),
+        Role: ("string", "ID ou menção de um cargo"),
+        Message: ("string", "ID de uma mensagem"),
+        Guild: ("string", "ID de um servidor Discord"),
+        str: ("string", "Texto"),
+        int: ("integer", "Número inteiro"),
+        float: ("number", "Número decimal"),
+        bool: ("boolean", "Verdadeiro ou falso"),
+    }
+    
+    if annotation == inspect.Parameter.empty:
+        return "string", "Parâmetro de texto"
+    
+    if annotation in type_mapping:
+        param_type, description = type_mapping[annotation]
+        return param_type, description
+    
+    annotation_name = annotation.__class__.__name__ if hasattr(annotation, '__class__') else str(annotation)
+    annotation_str = str(annotation)
+    
+    # Detectar tipos do discord.py por nome
+    if "discord." in annotation_str or "discord." in annotation_name:
+        if "User" in annotation_str:
+            return "string", "ID ou menção de um usuário Discord"
+        elif "Channel" in annotation_str or "TextChannel" in annotation_str:
+            return "string", "ID ou menção de um canal de texto"
+        elif "Role" in annotation_str:
+            return "string", "ID ou menção de um cargo"
+        elif "Member" in annotation_str:
+            return "string", "ID ou menção de um membro"
+        elif "Message" in annotation_str:
+            return "string", "ID de uma mensagem"
+        elif "Guild" in annotation_str:
+            return "string", "ID de um servidor"
+    
+    # Detectar converters customizados
+    if "Converter" in annotation_name or "converter" in annotation_str.lower():
+        if "Date" in annotation_str:
+            return "string", "Data (ex: '25/12/2024' ou '25/12/2024-15:30')"
+        elif "DeltaToDate" in annotation_str:
+            return "string", "Intervalo de tempo (ex: '2day5hour' para 2 dias e 5 horas ou '1a3month5days4hour10min' para 1 ano, 3 meses, 5 dias, 4 horas e 10 minutos)"
+        elif "NextDate" in annotation_str:
+            return "string", "Próxima data (ex: 'day2' para o próximo dia 2 do mês ou 'day15hour10' para o próximo dia 15 do mês às 10 horas)"
+        
+        print(f"Converter detectado, mas tipo específico desconhecido: {annotation} (str: {annotation_str}, name: {annotation_name})")
+        return "string", f"Parâmetro convertido ({annotation_name})"
+    
+    # Tratar Optional[T] (que é Union[T, None])
+    origin = get_origin(annotation)
+    if origin is Union:
+        args = get_args(annotation)
+        # Optional[T] é Union[T, None], pegar o primeiro que não seja None
+        for arg in args:
+            if arg is not type(None):
+                return _get_param_type_and_description(arg)
+    
+    # Tratar Union[T1, T2, ...]
+    if origin is Union:
+        args = get_args(annotation)
+        # Tentar encontrar um tipo útil
+        for arg in args:
+            if arg is not type(None):
+                return _get_param_type_and_description(arg)
+    
+    print(f"Tipo desconhecido para anotação: {annotation} (str: {annotation_str}, name: {annotation_name})")
+    return "string", f"Parâmetro ({annotation_name})"
 
 
 def _build_tool_properties_from_signature(func: Callable) -> tuple[dict, list]:
@@ -34,23 +115,12 @@ def _build_tool_properties_from_signature(func: Callable) -> tuple[dict, list]:
     for param_name, param in sig.parameters.items():
         if param_name in params_to_skip:
             continue
-            
-        param_type = "string"
-        if param.annotation != inspect.Parameter.empty:
-            if param.annotation == int:
-                param_type = "integer"
-            elif param.annotation == float:
-                param_type = "number"
-            elif param.annotation == bool:
-                param_type = "boolean"
-            elif param.annotation == str:
-                param_type = "string"
-            else:
-                print(f"Tipo de parâmetro '{param.annotation}' não é suportado, usando 'string' por padrão.")
+        
+        param_type, param_description = _get_param_type_and_description(param.annotation)
         
         properties[param_name] = {
             "type": param_type,
-            "description": f"Parâmetro {param_name}"
+            "description": param_description
         }
         
         if param.default == inspect.Parameter.empty:
@@ -184,7 +254,7 @@ def generate_response(
     if use_tools and available_tools:
         kwargs["tools"] = available_tools
     
-    response = client.chat.completions.create(**kwargs)
+    response: ChatCompletion = client.chat.completions.create(**kwargs)
     
     tool_calls = []
     if hasattr(response.choices[0].message, "tool_calls") and response.choices[0].message.tool_calls:
@@ -251,7 +321,6 @@ class AI(commands.Cog, name="ai"):
             )
             return
 
-        # Construir histórico de mensagens
         messages: list[ChatCompletionMessageParam] = [
             {"role": "system", "content": SYSTEM_PROMPT}
         ]
@@ -259,10 +328,8 @@ class AI(commands.Cog, name="ai"):
         messages.append({"role": "user", "content": question})
 
         try:
-            # Construir ferramentas dinamicamente
             available_tools = build_available_tools(self.bot)
             
-            # Chamar a IA com tools
             response, tool_calls = generate_response(messages, available_tools, use_tools=True)
             
             if response is None:
@@ -272,7 +339,6 @@ class AI(commands.Cog, name="ai"):
             if response.strip() != "":
                 await ctx.send(response)
 
-            # Executar ferramentas se solicitadas
             executor = AIToolExecutor(ctx, self.bot)
             for tool_call in tool_calls:
                 success, tool_result = await executor.execute(tool_call["name"], tool_call["input"])

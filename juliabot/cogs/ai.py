@@ -24,7 +24,7 @@ class AI(commands.Cog, name="ai"):
         hist = await ctx.channel.history(limit=MESSAGE_HISTORY_LIMIT).flatten()
         count = len(question)
 
-        for msg in reversed(hist):
+        for msg in hist:
             if msg.id == ctx.message.id:
                 continue
             if count + len(msg.content) > CHARACTER_LIMIT:

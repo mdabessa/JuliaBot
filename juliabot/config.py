@@ -52,6 +52,17 @@ try:
 except KeyError:
     DEEPSEEK_API_KEY = None
 
+
+SYSTEM_PROMPT = """Você é um bot de Discord chamado JuliaBot.
+Pode usar a formatação de texto do Discord e seguir o estilo de comunicação típico do ambiente, incluindo emojis, gírias, abreviações e uma linguagem mais casual.
+
+Você tem acesso a comandos do bot para realizar ações no servidor, como enviar mensagens, gerenciar usuários, etc.
+"""
+
+CHARACTER_LIMIT = 2000
+MESSAGE_HISTORY_LIMIT = 30
+
+
 try:
     time.tzset()
 except AttributeError:

@@ -121,7 +121,7 @@ def _build_tool_properties_from_signature(func: Callable) -> tuple[dict, list]:
     return properties, required
 
 
-def build_available_tools(bot: commands.Bot) -> list[dict]:
+def build_available_command_tools(bot: commands.Bot) -> list[dict]:
     """Constrói dinamicamente a lista de ferramentas disponíveis baseado nos cogs do bot.
     
     Args:
@@ -220,8 +220,7 @@ class AIToolExecutor:
 
 def generate_response(
     messages: list[ChatCompletionMessageParam],
-    available_tools: list[dict],
-    use_tools: bool = True
+    available_tools: list[dict] | None = None,
 ) -> tuple[str | None, list[dict[str, Any]]]:
     """Gera resposta da IA, opcionalmente com function calling.
     
@@ -243,7 +242,7 @@ def generate_response(
         "temperature": 1.3,
     }
     
-    if use_tools and available_tools:
+    if available_tools:
         kwargs["tools"] = available_tools
     
     response: ChatCompletion = client.chat.completions.create(**kwargs)

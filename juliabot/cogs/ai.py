@@ -1,7 +1,7 @@
 from discord.ext import commands
 from openai.types.chat import ChatCompletionMessageParam, ChatCompletion
 
-from ..ai import generate_response, build_available_tools, AIToolExecutor
+from ..ai import generate_response, build_available_command_tools, AIToolExecutor
 from ..config import CHARACTER_LIMIT, MESSAGE_HISTORY_LIMIT, SYSTEM_PROMPT
 
 
@@ -67,9 +67,9 @@ class AI(commands.Cog, name="ai"):
         messages.append({"role": "user", "content": question})
 
         try:
-            available_tools = build_available_tools(self.bot)
+            available_tools = build_available_command_tools(self.bot)
             
-            response, tool_calls = generate_response(messages, available_tools, use_tools=True)
+            response, tool_calls = generate_response(messages, available_tools)
             
             if response is None:
                 await ctx.send("❌ Desculpe, não consegui gerar uma resposta.")

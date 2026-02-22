@@ -29,6 +29,9 @@ class AI(commands.Cog, name="ai"):
                 continue
             if count + len(msg.content) > CHARACTER_LIMIT:
                 break
+            if msg.content.startswith(ctx.prefix + "breakpoint") or msg.content.startswith(ctx.prefix + "bp"):
+                break
+
             count_updated = count + len(msg.content)
             
             if msg.author == self.bot.user:
@@ -86,6 +89,38 @@ class AI(commands.Cog, name="ai"):
         except Exception as e:
             await ctx.send(f"❌ Erro ao processar sua pergunta: {str(e)}")
             raise e
+
+
+    @commands.command(
+        name="breakpoint",
+        brief="Adiciona um ponto de quebra no histórico do chat",
+        description="Adiciona um ponto de quebra no histórico do chat, fazendo com que mensagens anteriores não sejam consideradas no contexto da IA.",
+        aliases=["bp"],
+    )
+    async def breakpoint(self, ctx: commands.Context) -> None:
+        await ctx.message.add_reaction("👍")
+
+    @commands.command(
+        name='ai_history',
+        brief='Mostra o histórico de mensagens usadas pela IA',
+        description='Exibe as mensagens recentes do canal que serão usadas como contexto para a IA, até o limite de caracteres.',
+        aliases=['aih'],
+    )
+    async def ai_history(self, ctx: commands.Context) -> None:
+        messages: list[ChatCompletionMessageParam] = [
+            {"role": "system", "content": SYSTEM_PROMPT}
+        ]
+        await self._build_message_history(ctx, "", messages)
+        
+        if len(messages) <= 1:
+            await ctx.send("Nenhuma mensagem recente encontrada para o histórico da IA.")
+            return
+        
+        history_text = "\n\n".join(
+            f"**{msg['role'].capitalize()}**: {msg['content']}" for msg in messages
+        )
+        
+        await ctx.send(f"📜 **Histórico de mensagens para a IA:**\n{history_text}")
 
 
 def setup(bot: commands.Bot):

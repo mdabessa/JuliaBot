@@ -228,7 +228,7 @@ class AI(commands.Cog, name="ai"):
         self,
         ctx: commands.Context,
         question: str,
-        messages: list[ChatCompletionMessageParam]
+        messages: list[dict[str, str]]
     ) -> None:
         """Constrói o histórico de mensagens do canal para contexto."""
     
@@ -271,7 +271,7 @@ class AI(commands.Cog, name="ai"):
             )
             return
 
-        messages: list[ChatCompletionMessageParam] = [
+        messages= [
             {"role": "system", "content": SYSTEM_PROMPT}
         ]
         await self._build_message_history(ctx, question, messages)
@@ -281,13 +281,11 @@ class AI(commands.Cog, name="ai"):
             available_tools = build_available_command_tools(self.bot)
             
             response, tool_calls = generate_response(messages, available_tools)
+            response_text = response.response
             
-            if response is None:
-                await ctx.send("❌ Desculpe, não consegui gerar uma resposta.")
-                return
             
-            if response.strip() != "":
-                await ctx.send(response)
+            if response_text.strip() != "":
+                await ctx.send(response_text)
 
             executor = AIToolExecutor(ctx, self.bot)
             for tool_call in tool_calls:

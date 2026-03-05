@@ -1,5 +1,4 @@
 from discord.ext import commands
-from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel
 
 from ..ai import generate_response
@@ -15,13 +14,13 @@ class GameSession:
     
     def __init__(self, channel_id: int):
         self.channel_id = channel_id
-        self.messages: list[ChatCompletionMessageParam] = []
+        self.messages = []
         
     def add_message(self, role: str, content: str) -> None:
         """Adiciona uma mensagem ao histórico da sessão."""
         self.messages.append({"role": role, "content": content})
     
-    def get_context(self) -> list[ChatCompletionMessageParam]:
+    def get_context(self) -> list[dict[str, str]]:
         """Gera o contexto atual da sessão para a IA."""
         system_prompt = "You are a helpful assistant for a text-based adventure game. Respond to the player's actions and guide them through the story."
         context = [
@@ -52,7 +51,7 @@ class Game(commands.Cog):
 
         session.add_message("system", "A new game session has started. The player is ready to begin their adventure. Generate the initial game scenario.")
         context = session.get_context()
-        response, _ = generate_response(context)
+        response = generate_response(context)
 
         content = response.response.strip()
         session.add_message("assistant", content)
@@ -71,7 +70,7 @@ class Game(commands.Cog):
         session.add_message("user", action)
         
         context = session.get_context()
-        response, _ = generate_response(context, response_format=GameResponse)
+        response = generate_response(context, response_format=GameResponse)
         
         session.add_message("assistant", response.game_response)
         

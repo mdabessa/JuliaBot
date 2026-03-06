@@ -81,6 +81,16 @@ class Game(commands.Cog):
 
         await ctx.send(msg)
 
+    @commands.command(name="endgame")
+    async def end_game(self, ctx):
+        """Encerra a sessão de jogo ativa no canal."""
+        if ctx.channel.id not in self.sessions:
+            await ctx.send("Nenhuma sessão de jogo ativa para encerrar.")
+            return
+        
+        del self.sessions[ctx.channel.id]
+        await ctx.send("Sessão de jogo encerrada. Use `!startgame` para iniciar uma nova sessão.")
+        
 
 def setup(bot):
     bot.add_cog(Game(bot))

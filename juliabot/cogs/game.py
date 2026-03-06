@@ -1,3 +1,5 @@
+from typing import Optional
+
 from discord.ext import commands
 from pydantic import BaseModel
 
@@ -40,7 +42,7 @@ class Game(commands.Cog):
         self.sessions: dict[int, GameSession] = {}
     
     @commands.command(name="startgame")
-    async def start_game(self, ctx):
+    async def start_game(self, ctx, seed: Optional[str] = None):
         """Inicia uma nova sessão de jogo para o canal."""
         if ctx.channel.id in self.sessions:
             await ctx.send("Já existe uma sessão de jogo ativa neste canal.")
@@ -49,7 +51,11 @@ class Game(commands.Cog):
         session = GameSession(ctx.channel.id)
         self.sessions[ctx.channel.id] = session
 
-        session.add_message("system", "A new game session has started. The player is ready to begin their adventure. Generate the initial game scenario.")
+        start_message = "Guide the player through the text-based adventure. You can use the formatting schema of Discord to enhance the storytelling experience.\nA new game session has started. The player is ready to begin their adventure. Generate the initial game scenario."
+        if seed:
+            start_message += f"\nThe seed for this game is: {seed}"
+
+        session.add_message("system", start_message)
         context = session.get_context()
         response = generate_response(context)
 

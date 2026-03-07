@@ -6,7 +6,7 @@ from sqlalchemy.exc import PendingRollbackError
 from ..models import rollback
 
 
-class ErrorHandler(commands.Cog):
+class ErrorHandlerCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
@@ -48,4 +48,4 @@ class ErrorHandler(commands.Cog):
 
 
 def setup(bot):
-    bot.add_cog(ErrorHandler(bot))
+    bot.add_cog(ErrorHandlerCog(bot))

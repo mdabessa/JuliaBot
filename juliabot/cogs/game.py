@@ -32,7 +32,7 @@ class GameSession:
         return context
 
 
-class Game(commands.Cog):
+class GameCog(commands.Cog):
     """Cog para gerenciar sessões de jogo."""
     
     embed_title = ":video_game: Text Adventure Game"
@@ -99,5 +99,5 @@ class Game(commands.Cog):
         
 
 def setup(bot):
-    bot.add_cog(Game(bot))
+    bot.add_cog(GameCog(bot))
     

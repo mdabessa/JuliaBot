@@ -7,7 +7,7 @@ from discord.ext import commands, tasks
 from ..converters import Date
 
 
-class Utilities(commands.Cog):
+class UtilitiesCog(commands.Cog):
     """Utilities"""
 
     embed_title = ":paperclip: Utilities"
@@ -84,4 +84,4 @@ class Utilities(commands.Cog):
 
 
 def setup(bot: commands.Bot):
-    bot.add_cog(Utilities(bot))
+    bot.add_cog(UtilitiesCog(bot))

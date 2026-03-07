@@ -6,7 +6,7 @@ from discord.ext import commands
 from ..models import Server
 
 
-class ServerConfig(commands.Cog, name="configuracoes"):
+class ServerConfigCog(commands.Cog, name="configuracoes"):
     """Categoria relacionada a comandos de configuração do servidor."""
 
     embed_title = ":gear:Configurações."
@@ -51,4 +51,4 @@ class ServerConfig(commands.Cog, name="configuracoes"):
 
 
 def setup(bot: commands.Bot):
-    bot.add_cog(ServerConfig(bot))
+    bot.add_cog(ServerConfigCog(bot))

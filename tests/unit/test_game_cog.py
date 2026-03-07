@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from juliabot.cogs.game import Game, GameResponse, GameSession
+from juliabot.cogs.game import GameCog, GameResponse, GameSession
 
 
 def test_game_session_context_contains_system_and_messages():
@@ -36,11 +36,11 @@ async def test_start_play_end_game_flow(monkeypatch):
         sent.append(msg)
 
     ctx = SimpleNamespace(channel=SimpleNamespace(id=42), send=send)
-    cog = Game(bot=SimpleNamespace())
+    cog = GameCog(bot=SimpleNamespace())
 
-    await Game.start_game.callback(cog, ctx, seed="abc")
-    await Game.play.callback(cog, ctx, action="go north")
-    await Game.end_game.callback(cog, ctx)
+    await GameCog.start_game.callback(cog, ctx, seed="abc")
+    await GameCog.play.callback(cog, ctx, action="go north")
+    await GameCog.end_game.callback(cog, ctx)
 
     assert sent[0] == "Start"
     assert "Action result" in sent[1]

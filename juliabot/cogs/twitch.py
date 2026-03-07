@@ -6,7 +6,7 @@ from discord.ext import commands, tasks
 from ..models import TwitchNotifier
 
 
-class Twitch(commands.Cog):
+class TwitchCog(commands.Cog):
     """Twitch"""
 
     embed_title = ":tv: Twitch"
@@ -24,7 +24,7 @@ class Twitch(commands.Cog):
 
     @staticmethod
     def is_streamer_online(streamer: str) -> bool:
-        url = Twitch.get_streamer_url(streamer)
+        url = TwitchCog.get_streamer_url(streamer)
         response = requests.get(url)
         if response.status_code != 200:
             raise Exception(f"Erro ao acessar {url}.")
@@ -38,7 +38,7 @@ class Twitch(commands.Cog):
         aliases=["str", "streamer"],
     )
     async def stream(self, ctx: commands.Context, streamer: str):
-        status = Twitch.is_streamer_online(streamer)
+        status = TwitchCog.is_streamer_online(streamer)
         status = "online" if status else "offline"
 
         await ctx.send(f"`{streamer}` está {status}.")
@@ -108,7 +108,7 @@ class Twitch(commands.Cog):
         cache = {}
         for notifier in TwitchNotifier.get_all():
             if notifier.streamer_id not in cache:
-                cache[notifier.streamer_id] = Twitch.is_streamer_online(
+                cache[notifier.streamer_id] = TwitchCog.is_streamer_online(
                     notifier.streamer_id
                 )
                 time.sleep(1)
@@ -116,7 +116,7 @@ class Twitch(commands.Cog):
             if cache[notifier.streamer_id] and not notifier.notified:
                 channel = self.bot.get_channel(int(notifier.channel_id))
                 await channel.send(
-                    f"{notifier.streamer_id} está online! Assista em {Twitch.get_streamer_url(notifier.streamer_id)}."
+                    f"{notifier.streamer_id} está online! Assista em {TwitchCog.get_streamer_url(notifier.streamer_id)}."
                 )
 
                 notifier.notified = True
@@ -129,4 +129,4 @@ class Twitch(commands.Cog):
 
 
 def setup(bot: commands.Bot):
-    bot.add_cog(Twitch(bot))
+    bot.add_cog(TwitchCog(bot))

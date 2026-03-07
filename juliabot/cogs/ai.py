@@ -4,7 +4,7 @@ from ..ai import generate_response
 from ..config import CHARACTER_LIMIT, MESSAGE_HISTORY_LIMIT, SYSTEM_PROMPT
 
 
-class AI(commands.Cog, name="ai"):
+class AICog(commands.Cog, name="ai"):
     """Categoria relacionada a comandos e funções de inteligência artificial."""
 
     embed_title = ":robot: AI"
@@ -110,4 +110,4 @@ class AI(commands.Cog, name="ai"):
 
 
 def setup(bot: commands.Bot):
-    bot.add_cog(AI(bot))
+    bot.add_cog(AICog(bot))

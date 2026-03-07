@@ -4,7 +4,7 @@ from discord import Embed
 from discord.ext import commands
 
 
-class Help(commands.Cog, name="help"):
+class HelpCog(commands.Cog, name="help"):
     """Categoria relacionada para ajudar e descrever os comandos do bot."""
 
     embed_title = ":question:Help."
@@ -97,4 +97,4 @@ class Help(commands.Cog, name="help"):
 
 
 def setup(bot: commands.Bot):
-    bot.add_cog(Help(bot))
+    bot.add_cog(HelpCog(bot))

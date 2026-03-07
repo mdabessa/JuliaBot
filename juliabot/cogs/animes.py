@@ -12,7 +12,7 @@ from ..models import AnimesList, AnimesNotifier, Server, User
 from ..scripts import Script
 
 
-class Animes(commands.Cog, name="animes"):
+class AnimesCog(commands.Cog, name="animes"):
     """Categoria relacionado a comandos e de animes em geral."""
 
     embed_title = ":japanese_goblin:Animes."
@@ -402,4 +402,4 @@ class Animes(commands.Cog, name="animes"):
 
 
 def setup(bot: commands.Bot):
-    bot.add_cog(Animes(bot))
+    bot.add_cog(AnimesCog(bot))

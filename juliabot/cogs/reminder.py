@@ -9,7 +9,7 @@ from ..models import Reminder, Server
 from ..scripts import Script
 
 
-class _Reminder(commands.Cog, name="reminder"):
+class _ReminderCog(commands.Cog, name="reminder"):
     """Categoria relacionada a comandos de lembrete."""
 
     embed_title = ":alarm_clock:Reminder."
@@ -171,4 +171,4 @@ class _Reminder(commands.Cog, name="reminder"):
 
 
 def setup(bot: commands.Bot):
-    bot.add_cog(_Reminder(bot))
+    bot.add_cog(_ReminderCog(bot))

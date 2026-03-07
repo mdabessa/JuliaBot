@@ -8,7 +8,7 @@ from discord.ext import commands
 from ..scripts import Script
 
 
-class Fun(commands.Cog, name="fun"):
+class FunCog(commands.Cog, name="fun"):
     """Categoria relacionada a comandos de diversão."""
 
     embed_title = ":game_die:Diversão."
@@ -108,4 +108,4 @@ class Fun(commands.Cog, name="fun"):
 
 
 def setup(bot: commands.Bot):
-    bot.add_cog(Fun(bot))
+    bot.add_cog(FunCog(bot))

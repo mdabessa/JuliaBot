@@ -3,7 +3,7 @@ from discord.ext import commands
 from ..scripts import Script
 
 
-class Debug(commands.Cog):
+class DebugCog(commands.Cog):
     """Debug"""
 
     embed_title = "debug"
@@ -56,4 +56,4 @@ class Debug(commands.Cog):
 
 
 def setup(bot: commands.Bot):
-    bot.add_cog(Debug(bot))
+    bot.add_cog(DebugCog(bot))

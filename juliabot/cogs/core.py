@@ -9,7 +9,7 @@ from ..models import BotConfig, Server
 from ..scripts import Script
 
 
-class Core(commands.Cog, name="core"):
+class CoreCog(commands.Cog, name="core"):
     """Categoria relacionada a comandos e funções cores do bot."""
 
     embed_title = ":brain:Core."
@@ -109,4 +109,4 @@ class Core(commands.Cog, name="core"):
 
 
 def setup(bot: commands.Bot):
-    bot.add_cog(Core(bot))
+    bot.add_cog(CoreCog(bot))

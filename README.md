@@ -24,5 +24,8 @@ JuliaBot is a Discord bot written in Python using the [discord.py](https://githu
 ## Commands
 The help command can be used to get a list of all commands and can be passed a command name to get more information about a specific command. The prefix can be changed using the `prefix` command.
 
+## Testing
+To run the tests, use the command `pytest` in the root directory of the repository.
+
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details

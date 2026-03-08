@@ -257,12 +257,8 @@ class UpdateCollector:
             List[CommitInfo]: Commit entries ordered from newest to oldest.
         """
         if GITHUB_REPOSITORY:
-            try:
-                commits = UpdateCollector._fetch_commits_from_github(limit=limit)
-                if commits:
-                    return commits
-            except Exception:
-                pass
+            commits = UpdateCollector._fetch_commits_from_github(limit=limit)
+            return commits
 
         return UpdateCollector._fetch_commits_from_git(limit=limit)
 

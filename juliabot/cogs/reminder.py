@@ -1,3 +1,9 @@
+"""Reminder and scheduling cog.
+
+Provides commands to create, list, and manage reminders with recurrence
+support using Discord reactions.
+"""
+
 from typing import Union
 
 from discord import Embed
@@ -10,7 +16,11 @@ from ..scripts import Script
 
 
 class _ReminderCog(commands.Cog, name="reminder"):
-    """Categoria relacionada a comandos de lembrete."""
+    """Reminder management and scheduling.
+
+    Provides commands to create recurring and one-time reminders, with
+    background task handling for notifications.
+    """
 
     embed_title = ":alarm_clock:Reminder."
 

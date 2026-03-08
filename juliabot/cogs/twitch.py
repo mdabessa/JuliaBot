@@ -1,3 +1,9 @@
+"""Twitch streamer notification cog.
+
+Provides commands to track Twitch streamers and receive notifications
+when they go live.
+"""
+
 import time
 
 import requests
@@ -7,7 +13,11 @@ from ..models import TwitchNotifier
 
 
 class TwitchCog(commands.Cog):
-    """Twitch"""
+    """Twitch streamer live notifications.
+
+    Monitors Twitch streamers and posts notifications to configured channels
+    when they go live.
+    """
 
     embed_title = ":tv: Twitch"
 

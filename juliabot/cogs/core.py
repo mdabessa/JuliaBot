@@ -1,3 +1,9 @@
+"""Core bot commands cog.
+
+Provides essential bot commands like ping, prefix display, time, and script
+timeout management.
+"""
+
 from datetime import datetime
 from time import time
 
@@ -10,7 +16,11 @@ from ..scripts import Script
 
 
 class CoreCog(commands.Cog, name="core"):
-    """Categoria relacionada a comandos e funções cores do bot."""
+    """Core bot functionality.
+
+    Provides essential commands: ping, prefix lookup, current time display,
+    message repeating, and script timeout management.
+    """
 
     embed_title = ":brain:Core."
 

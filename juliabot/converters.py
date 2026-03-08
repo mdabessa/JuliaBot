@@ -1,3 +1,9 @@
+"""Discord command argument converters for date and time parsing.
+
+Provides converter classes for parsing various date/time formats used by
+reminder and scheduling commands.
+"""
+
 import datetime
 import logging
 import re
@@ -21,6 +27,16 @@ STEPS = {
 
 
 def split_word(word, reverse=False):
+    """Parse a word into numeric + string pairs using regex.
+
+    Args:
+        word (str): Word to parse.
+        reverse (bool, optional): If True, matches digits before letters;
+            otherwise matches letters before digits. Defaults to False.
+
+    Returns:
+        list: List of [number, string] pairs extracted from the word.
+    """
     if reverse:
         regex = r"(\d+)([a-zA-Z]*)"
     else:
@@ -44,7 +60,25 @@ def split_word(word, reverse=False):
 
 
 class Date(commands.Converter):
+    """Convert date strings in various formats to aware datetime objects.
+
+    Supported formats: DD/MM/YYYY-HH:MM, HH:MM-DD/MM/YYYY, DD/MM/YYYY.
+    Respects server timezone when available; otherwise uses UTC.
+    """
+
     async def convert(self, ctx: commands.Context, argument: str) -> datetime.datetime:
+        """Convert a date string to a timezone-aware datetime in UTC.
+
+        Args:
+            ctx (commands.Context): Command context for guild/server timezone lookup.
+            argument (str): Date string in a supported format.
+
+        Returns:
+            datetime.datetime: Parsed and timezone-converted datetime in UTC.
+
+        Raises:
+            Exception: If the argument cannot be parsed in any supported format.
+        """
         formats = [
             "%d/%m/%Y-%H:%M",
             "%H:%M-%d/%m/%Y",
@@ -82,9 +116,30 @@ class Date(commands.Converter):
 
 
 class DeltaToDate(commands.Converter):
+    """Convert relative time offsets (e.g., '1d2h30m') to absolute dates.
+
+    Interprets input as a duration relative to a start time (default: now)
+    and returns the resulting absolute datetime.
+    """
+
     async def convert(
         self, ctx: commands.Context, argument: str, start: datetime = None
     ) -> datetime.datetime:
+        """Convert a relative time offset to an absolute datetime.
+
+        Args:
+            ctx (commands.Context): Command context for timezone lookup.
+            argument (str): Relative time string (e.g., '1d', '2h30m').
+            start (datetime, optional): Reference time to add the offset to.
+                Defaults to current UTC time.
+
+        Returns:
+            datetime.datetime: Absolute datetime in UTC after adding the offset.
+
+        Raises:
+            Exception: If the argument does not start with a digit or contains
+            invalid time units.
+        """
         if not argument[0].isdigit():
             raise Exception(f"Não é possivel converter {argument} em DeltaToDate.")
 
@@ -128,9 +183,30 @@ class DeltaToDate(commands.Converter):
 
 
 class NextDate(commands.Converter):
+    """Convert natural time expressions (e.g., 'monday 14:30') to next occurrence.
+
+    Parses time components without leading digits and schedules for the next
+    upcoming occurrence of the specified time.
+    """
+
     async def convert(
         self, ctx: commands.Context, argument: str, start: datetime = None
     ) -> datetime.datetime:
+        """Parse a natural time expression and return the next occurrence.
+
+        Args:
+            ctx (commands.Context): Command context for timezone lookup.
+            argument (str): Time string without leading digits (e.g., 'monday 14:30').
+            start (datetime, optional): Start time for offset calculation.
+                Defaults to current datetime in the server timezone.
+
+        Returns:
+            datetime.datetime: Next absolute datetime matching the expression, in UTC.
+
+        Raises:
+            Exception: If the argument starts with a digit or contains invalid
+            time units, or if no valid future date can be computed.
+        """
         if argument[0].isdigit():
             raise Exception(f"Não é possivel converter {argument} em NextDate.")
 

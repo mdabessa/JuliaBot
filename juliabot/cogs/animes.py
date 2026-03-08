@@ -1,3 +1,9 @@
+"""Anime search and watchlist management cog.
+
+Provides commands to search for animes, view details, and manage a personal
+watchlist with Jikan API integration.
+"""
+
 import logging
 from typing import Optional
 
@@ -16,7 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 class AnimesCog(commands.Cog, name="animes"):
-    """Categoria relacionado a comandos e de animes em geral."""
+    """Anime search and watchlist management.
+
+    Provides interactive anime search with pagination and watchlist operations
+    using the Jikan MyAnimeList API.
+    """
 
     embed_title = ":japanese_goblin:Animes."
 

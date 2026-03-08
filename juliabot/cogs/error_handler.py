@@ -1,3 +1,9 @@
+"""Error handling cog for command exceptions.
+
+Centralized error handler providing user-friendly messages for common
+command execution errors.
+"""
+
 import traceback
 
 from discord.ext import commands
@@ -7,6 +13,12 @@ from ..models import rollback
 
 
 class ErrorHandlerCog(commands.Cog):
+    """Handles and reports command execution errors.
+
+    Provides user-friendly error messages for common failures like missing
+    permissions, invalid arguments, and database issues.
+    """
+
     def __init__(self, bot):
         self.bot = bot
 

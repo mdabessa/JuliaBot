@@ -1,3 +1,9 @@
+"""Entry point for running JuliaBot.
+
+This module initializes logging, database, and the Discord bot client.
+It detects if an instance is already running and starts the bot accordingly.
+"""
+
 import argparse
 import datetime
 import logging

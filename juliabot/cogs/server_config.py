@@ -1,3 +1,9 @@
+"""Server configuration cog.
+
+Provides administrative commands to customize bot behavior per guild,
+including prefix and timezone settings.
+"""
+
 import datetime
 
 import pytz
@@ -7,7 +13,11 @@ from ..models import Server
 
 
 class ServerConfigCog(commands.Cog, name="configuracoes"):
-    """Categoria relacionada a comandos de configuração do servidor."""
+    """Server configuration management.
+
+    Provides administrative commands for configuring guild-specific settings
+    like command prefix and timezone.
+    """
 
     embed_title = ":gear:Configurações."
 

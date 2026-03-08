@@ -1,3 +1,9 @@
+"""Utility commands cog.
+
+Provides general utility commands like text translation and channel history
+export.
+"""
+
 import os
 
 from deep_translator import GoogleTranslator
@@ -8,7 +14,10 @@ from ..converters import Date
 
 
 class UtilitiesCog(commands.Cog):
-    """Utilities"""
+    """General utility commands.
+
+    Provides text translation and channel history export utilities.
+    """
 
     embed_title = ":paperclip: Utilities"
 

@@ -1,3 +1,9 @@
+"""Changelog automation and display cog.
+
+Provides commands to display changelog updates and auto-posts new releases
+to configured channels.
+"""
+
 from datetime import datetime
 
 from discord.ext import commands
@@ -9,7 +15,11 @@ from ..models import Server
 
 
 class ChangelogCog(commands.Cog):
-    """Changelog"""
+    """Changelog automation and display.
+
+    Monitors for new commits and posts changelog updates to configured
+    server channels.
+    """
 
     embed_title = ":newspaper: Changelog"
 

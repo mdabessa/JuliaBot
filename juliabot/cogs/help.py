@@ -1,3 +1,8 @@
+"""Help command cog with category support.
+
+Provides an interactive help system displaying commands and cog information.
+"""
+
 from typing import Optional
 
 from discord import Embed
@@ -5,7 +10,11 @@ from discord.ext import commands
 
 
 class HelpCog(commands.Cog, name="help"):
-    """Categoria relacionada para ajudar e descrever os comandos do bot."""
+    """Help and command documentation.
+
+        Provides help information for commands and cog categories with
+    declarative formatting.
+    """
 
     embed_title = ":question:Help."
 

@@ -1,10 +1,20 @@
+"""Debug utilities cog for bot owners.
+
+Provides commands to reload cogs, inspect running scripts, and execute
+commands as other users.
+"""
+
 from discord.ext import commands
 
 from ..scripts import Script
 
 
 class DebugCog(commands.Cog):
-    """Debug"""
+    """Debug and administrative utilities.
+
+    Restricted to bot owner. Provides cog reloading, script inspection,
+    and command execution utilities.
+    """
 
     embed_title = "debug"
 

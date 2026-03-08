@@ -1,3 +1,8 @@
+"""Fun and game commands cog.
+
+Provides entertainment commands like duels, dice rolls, and random options.
+"""
+
 import time
 from random import randint, shuffle
 from typing import Optional
@@ -9,7 +14,11 @@ from ..scripts import Script
 
 
 class FunCog(commands.Cog, name="fun"):
-    """Categoria relacionada a comandos de diversão."""
+    """Entertainment and game commands.
+
+    Provides interactive games like duels and dice rolls with discord.py
+    reaction-based UI.
+    """
 
     embed_title = ":game_die:Diversão."
 

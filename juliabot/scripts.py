@@ -1,3 +1,9 @@
+"""Event-based script execution framework for async tasks.
+
+Provides Script and function decorator primitives for registering and managing
+named, event-triggered background scripts with shared cache and timeout logic.
+"""
+
 from __future__ import annotations
 
 import datetime
@@ -5,7 +11,13 @@ from typing import Any, Callable, Dict, List, Optional
 
 
 class Script:
-    index = 0
+    """Manages a named async function with event subscription and cache state.
+
+    Scripts are registered globally, tracked by execution events, and managed
+    with per-instance timeout and cache. Supports limiting concurrent instances
+    per name.
+    """
+
     functions: List[Dict[str, Any]] = []
     scripts: List[Script] = []
 

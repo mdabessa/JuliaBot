@@ -9,6 +9,8 @@ on:
 jobs:
   pytest:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}
 
     steps:
       - name: Checkout repository
@@ -26,4 +28,4 @@ jobs:
           pip install pytest
 
       - name: Run tests
-        run: pytest -q
+        run: python -m pytest -q

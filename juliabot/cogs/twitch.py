@@ -1,17 +1,28 @@
+"""Twitch streamer notification cog.
+
+Provides commands to track Twitch streamers and receive notifications
+when they go live.
+"""
+
 import time
 
 import requests
 from discord.ext import commands, tasks
 
+from ..client import Client
 from ..models import TwitchNotifier
 
 
 class TwitchCog(commands.Cog):
-    """Twitch"""
+    """Twitch streamer live notifications.
+
+    Monitors Twitch streamers and posts notifications to configured channels
+    when they go live.
+    """
 
     embed_title = ":tv: Twitch"
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: Client) -> None:
         self.bot = bot
 
     @commands.Cog.listener()
@@ -128,5 +139,5 @@ class TwitchCog(commands.Cog):
                 notifier.update()
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(TwitchCog(bot))

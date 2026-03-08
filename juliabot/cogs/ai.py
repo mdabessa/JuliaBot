@@ -1,21 +1,42 @@
+"""AI conversation cog with structured responses.
+
+Provides commands to interact with an AI assistant for questions and
+conversational tasks.
+"""
+
 from discord.ext import commands
 
 from ..ai import generate_response
+from ..client import Client
 from ..config import CHARACTER_LIMIT, MESSAGE_HISTORY_LIMIT, SYSTEM_PROMPT
 
 
 class AICog(commands.Cog, name="ai"):
-    """Categoria relacionada a comandos e funções de inteligência artificial."""
+    """AI conversation assistance.
+
+    Provides commands to ask questions and have conversations with an AI
+    assistant with channel history context.
+    """
 
     embed_title = ":robot: AI"
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: Client) -> None:
         self.bot = bot
 
     async def _build_message_history(
         self, ctx: commands.Context, question: str, messages: list[dict[str, str]]
     ) -> None:
-        """Constrói o histórico de mensagens do canal para contexto."""
+        """Build message history from channel for context.
+
+        Retrieves recent messages from the channel (up to a character limit
+        and message count limit) and inserts them into the message list
+        for AI context.
+
+        Args:
+            ctx (commands.Context): Command context.
+            question (str): The user's question.
+            messages (list): Message list to populate with history.
+        """
 
         hist = ctx.channel.history(limit=MESSAGE_HISTORY_LIMIT)
         count = len(question)
@@ -111,5 +132,5 @@ class AICog(commands.Cog, name="ai"):
         await ctx.send(f"📜 **Histórico de mensagens para a IA:**\n{history_text}")
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(AICog(bot))

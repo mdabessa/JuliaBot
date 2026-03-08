@@ -1,13 +1,26 @@
+"""Error handling cog for command exceptions.
+
+Centralized error handler providing user-friendly messages for common
+command execution errors.
+"""
+
 import traceback
 
 from discord.ext import commands
 from sqlalchemy.exc import PendingRollbackError
 
+from ..client import Client
 from ..models import rollback
 
 
 class ErrorHandlerCog(commands.Cog):
-    def __init__(self, bot):
+    """Handles and reports command execution errors.
+
+    Provides user-friendly error messages for common failures like missing
+    permissions, invalid arguments, and database issues.
+    """
+
+    def __init__(self, bot: Client):
         self.bot = bot
 
     @commands.Cog.listener()
@@ -47,5 +60,5 @@ class ErrorHandlerCog(commands.Cog):
         traceback.print_exception(type(error), error, error.__traceback__)
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(ErrorHandlerCog(bot))

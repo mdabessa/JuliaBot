@@ -1,3 +1,8 @@
+"""Fun and game commands cog.
+
+Provides entertainment commands like duels, dice rolls, and random options.
+"""
+
 import time
 from random import randint, shuffle
 from typing import Optional
@@ -5,15 +10,20 @@ from typing import Optional
 from discord import User
 from discord.ext import commands
 
+from ..client import Client
 from ..scripts import Script
 
 
 class FunCog(commands.Cog, name="fun"):
-    """Categoria relacionada a comandos de diversão."""
+    """Entertainment and game commands.
+
+    Provides interactive games like duels and dice rolls with discord.py
+    reaction-based UI.
+    """
 
     embed_title = ":game_die:Diversão."
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: Client) -> None:
         self.bot = bot
 
     @staticmethod
@@ -107,5 +117,5 @@ class FunCog(commands.Cog, name="fun"):
         await msg.edit(content=f"Resultado: {results[-1]} :game_die:")
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(FunCog(bot))

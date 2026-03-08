@@ -1,3 +1,9 @@
+"""Configuration module for JuliaBot.
+
+Loads environment variables and provides default values for database connections,
+API tokens, rate limits, and logging configuration.
+"""
+
 import logging
 import time
 from os import environ
@@ -76,7 +82,12 @@ MESSAGE_HISTORY_LIMIT = 30
 
 # Setup logging
 def setup_logging():
-    """Configure logging for the bot - usa o mesmo formato do discord.py"""
+    """Configure root and juliabot logging using a consistent format.
+
+    Sets up a stream handler with ISO 8601 timestamp formatting. Configures
+    the full root logger and the juliabot-specific logger to INFO level.
+    Logging is only configured if no handlers already exist.
+    """
     root_logger = logging.getLogger()
 
     if not root_logger.handlers:

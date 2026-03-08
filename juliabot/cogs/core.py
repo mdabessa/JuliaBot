@@ -1,3 +1,9 @@
+"""Core bot commands cog.
+
+Provides essential bot commands like ping, prefix display, time, and script
+timeout management.
+"""
+
 from datetime import datetime
 from time import time
 
@@ -5,16 +11,21 @@ import pytz
 from discord import Message, Reaction, User
 from discord.ext import commands, tasks
 
+from ..client import Client
 from ..models import BotConfig, Server
 from ..scripts import Script
 
 
 class CoreCog(commands.Cog, name="core"):
-    """Categoria relacionada a comandos e funções cores do bot."""
+    """Core bot functionality.
+
+    Provides essential commands: ping, prefix lookup, current time display,
+    message repeating, and script timeout management.
+    """
 
     embed_title = ":brain:Core."
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: Client) -> None:
         self.bot = bot
 
     async def _prefix(self, message: Message):
@@ -108,5 +119,5 @@ class CoreCog(commands.Cog, name="core"):
             heartbeat.update()
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(CoreCog(bot))

@@ -1,4 +1,10 @@
-from typing import List, Optional
+"""Embed builders for changelog summaries.
+
+This module converts categorized commit updates into a Discord embed suitable
+for posting recent bot changes.
+"""
+
+from typing import List
 
 from discord import Embed
 
@@ -6,6 +12,18 @@ from ..collect_updates import CommitInfo, UpdateCollector
 
 
 def changelog_embed(updates: List[CommitInfo], color: int) -> Embed:
+    """Build a changelog embed grouped by commit category.
+
+    Commits are grouped using ``UpdateCollector.group_commits_by_type`` and the
+    embed includes up to five short commit messages per category.
+
+    Args:
+        updates (List[CommitInfo]): Commit entries to render in the changelog.
+        color (int): Discord embed color value.
+
+    Returns:
+        Embed: A formatted changelog embed with one field per category.
+    """
     embed = Embed(
         title="Changelog",
         description="Últimas atualizações do Bot",

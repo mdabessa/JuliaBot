@@ -1,4 +1,8 @@
-from typing import List
+"""Embed builders for reminder messages.
+
+This module provides helpers to render reminder details, including recurring
+schedule information when available.
+"""
 
 import pytz
 from discord import Embed
@@ -8,6 +12,20 @@ from ..models import Reminder
 
 
 async def reminder_embed(reminder: Reminder, bot) -> Embed:
+    """Build an embed describing a reminder and its scheduling details.
+
+    The embed includes the reminder date, destination channel, and creation
+    timestamp. For recurring reminders, it also calculates and displays the next
+    occurrence in the server timezone.
+
+    Args:
+        reminder (Reminder): Reminder model containing trigger time, channel,
+            recurrence command, and server context.
+        bot: Bot instance used to resolve color and channel metadata.
+
+    Returns:
+        Embed: A populated reminder embed ready to be sent to Discord.
+    """
     embed = Embed(
         title=":alarm_clock: Lembrete :alarm_clock:",
         color=bot.color,

@@ -47,5 +47,5 @@ class ErrorHandlerCog(commands.Cog):
         traceback.print_exception(type(error), error, error.__traceback__)
 
 
-def setup(bot):
-    bot.add_cog(ErrorHandlerCog(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(ErrorHandlerCog(bot))

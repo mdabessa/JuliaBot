@@ -107,5 +107,5 @@ class FunCog(commands.Cog, name="fun"):
         await msg.edit(content=f"Resultado: {results[-1]} :game_die:")
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(FunCog(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(FunCog(bot))

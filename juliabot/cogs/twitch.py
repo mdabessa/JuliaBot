@@ -128,5 +128,5 @@ class TwitchCog(commands.Cog):
                 notifier.update()
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(TwitchCog(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(TwitchCog(bot))

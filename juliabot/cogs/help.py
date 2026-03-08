@@ -96,5 +96,5 @@ class HelpCog(commands.Cog, name="help"):
             await ctx.send(embed=embed)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(HelpCog(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(HelpCog(bot))

@@ -170,5 +170,5 @@ class _ReminderCog(commands.Cog, name="reminder"):
                 _reminder.delete()
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(_ReminderCog(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(_ReminderCog(bot))

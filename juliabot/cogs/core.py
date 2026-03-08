@@ -108,5 +108,5 @@ class CoreCog(commands.Cog, name="core"):
             heartbeat.update()
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(CoreCog(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(CoreCog(bot))

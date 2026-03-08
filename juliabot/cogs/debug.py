@@ -55,5 +55,5 @@ class DebugCog(commands.Cog):
         await self.bot.process_commands(new_message)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(DebugCog(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(DebugCog(bot))

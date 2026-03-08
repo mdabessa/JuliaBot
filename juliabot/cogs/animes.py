@@ -401,5 +401,5 @@ class AnimesCog(commands.Cog, name="animes"):
             print(e)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(AnimesCog(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(AnimesCog(bot))

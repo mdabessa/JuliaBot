@@ -20,15 +20,15 @@ class AICog(commands.Cog, name="ai"):
     ) -> None:
         """Constrói o histórico de mensagens do canal para contexto."""
     
-        hist = await ctx.channel.history(limit=MESSAGE_HISTORY_LIMIT).flatten()
+        hist = ctx.channel.history(limit=MESSAGE_HISTORY_LIMIT)
         count = len(question)
 
-        for msg in hist:
+        async for msg in hist:
             if msg.id == ctx.message.id:
                 continue
             if count + len(msg.content) > CHARACTER_LIMIT:
                 break
-            if msg.content.startswith(ctx.prefix + "breakpoint") or msg.content.startswith(ctx.prefix + "bp"):
+            if ctx.prefix is not None and (msg.content.startswith(ctx.prefix + "breakpoint") or msg.content.startswith(ctx.prefix + "bp")):
                 break
 
             count_updated = count + len(msg.content)
@@ -109,5 +109,5 @@ class AICog(commands.Cog, name="ai"):
         await ctx.send(f"📜 **Histórico de mensagens para a IA:**\n{history_text}")
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(AICog(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(AICog(bot))

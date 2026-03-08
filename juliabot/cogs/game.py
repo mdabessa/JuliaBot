@@ -98,6 +98,6 @@ class GameCog(commands.Cog):
         await ctx.send("Sessão de jogo encerrada. Use `!startgame` para iniciar uma nova sessão.")
         
 
-def setup(bot):
-    bot.add_cog(GameCog(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(GameCog(bot))
     

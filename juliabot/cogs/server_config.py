@@ -50,5 +50,5 @@ class ServerConfigCog(commands.Cog, name="configuracoes"):
         )
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(ServerConfigCog(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(ServerConfigCog(bot))

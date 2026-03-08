@@ -9,6 +9,7 @@ import datetime
 import pytz
 from discord.ext import commands
 
+from ..client import Client
 from ..models import Server
 
 
@@ -21,7 +22,7 @@ class ServerConfigCog(commands.Cog, name="configuracoes"):
 
     embed_title = ":gear:Configurações."
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: Client) -> None:
         self.bot = bot
 
     async def cog_check(self, ctx: commands.Context):
@@ -60,5 +61,5 @@ class ServerConfigCog(commands.Cog, name="configuracoes"):
         )
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(ServerConfigCog(bot))

@@ -13,6 +13,7 @@ from discord.errors import Forbidden, NotFound
 from discord.ext import commands, tasks
 from jikan4 import AioJikan
 
+from ..client import Client
 from ..config import BOT_JIKAN_RATE_LIMIT
 from ..embeds.anime import anime_embed, episode_embed
 from ..models import AnimesList, AnimesNotifier, Server, User
@@ -30,7 +31,7 @@ class AnimesCog(commands.Cog, name="animes"):
 
     embed_title = ":japanese_goblin:Animes."
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: Client) -> None:
         self.bot = bot
         self.jikan = AioJikan(rate_limit=BOT_JIKAN_RATE_LIMIT)
 
@@ -420,5 +421,5 @@ class AnimesCog(commands.Cog, name="animes"):
             logger.error(f"Error in anime notification task: {e}")
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(AnimesCog(bot))

@@ -6,12 +6,12 @@ support using Discord reactions.
 
 from typing import Union
 
-from discord import Embed
 from discord.ext import commands, tasks
 
+from ..client import Client
 from ..converters import Date, DeltaToDate, NextDate
 from ..embeds.reminder import reminder_embed
-from ..models import Reminder, Server
+from ..models import Reminder
 from ..scripts import Script
 
 
@@ -24,7 +24,7 @@ class _ReminderCog(commands.Cog, name="reminder"):
 
     embed_title = ":alarm_clock:Reminder."
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: Client) -> None:
         self.bot = bot
 
     @commands.Cog.listener()
@@ -180,5 +180,5 @@ class _ReminderCog(commands.Cog, name="reminder"):
                 _reminder.delete()
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(_ReminderCog(bot))

@@ -10,6 +10,7 @@ from typing import Optional
 from discord import User
 from discord.ext import commands
 
+from ..client import Client
 from ..scripts import Script
 
 
@@ -22,7 +23,7 @@ class FunCog(commands.Cog, name="fun"):
 
     embed_title = ":game_die:Diversão."
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: Client) -> None:
         self.bot = bot
 
     @staticmethod
@@ -116,5 +117,5 @@ class FunCog(commands.Cog, name="fun"):
         await msg.edit(content=f"Resultado: {results[-1]} :game_die:")
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(FunCog(bot))

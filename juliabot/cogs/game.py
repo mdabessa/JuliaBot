@@ -9,6 +9,7 @@ from discord.ext import commands
 from pydantic import BaseModel
 
 from ..ai import generate_response
+from ..client import Client
 
 
 class GameResponse(BaseModel):
@@ -52,7 +53,7 @@ class GameCog(commands.Cog):
 
     embed_title = ":video_game: Text Adventure Game"
 
-    def __init__(self, bot):
+    def __init__(self, bot: Client):
         self.bot = bot
         self.sessions: dict[int, GameSession] = {}
 
@@ -115,5 +116,5 @@ class GameCog(commands.Cog):
         )
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(GameCog(bot))

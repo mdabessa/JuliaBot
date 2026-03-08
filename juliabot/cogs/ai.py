@@ -7,6 +7,7 @@ conversational tasks.
 from discord.ext import commands
 
 from ..ai import generate_response
+from ..client import Client
 from ..config import CHARACTER_LIMIT, MESSAGE_HISTORY_LIMIT, SYSTEM_PROMPT
 
 
@@ -19,7 +20,7 @@ class AICog(commands.Cog, name="ai"):
 
     embed_title = ":robot: AI"
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: Client) -> None:
         self.bot = bot
 
     async def _build_message_history(
@@ -131,5 +132,5 @@ class AICog(commands.Cog, name="ai"):
         await ctx.send(f"📜 **Histórico de mensagens para a IA:**\n{history_text}")
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(AICog(bot))

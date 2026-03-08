@@ -8,6 +8,8 @@ from typing import Optional
 from discord import Embed
 from discord.ext import commands
 
+from ..client import Client
+
 
 class HelpCog(commands.Cog, name="help"):
     """Help and command documentation.
@@ -18,7 +20,7 @@ class HelpCog(commands.Cog, name="help"):
 
     embed_title = ":question:Help."
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: Client) -> None:
         self.bot = bot
 
     @commands.command(brief="Ajuda", aliases=["ajuda"])
@@ -105,5 +107,5 @@ class HelpCog(commands.Cog, name="help"):
             await ctx.send(embed=embed)
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(HelpCog(bot))

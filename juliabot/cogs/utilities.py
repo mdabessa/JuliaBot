@@ -8,8 +8,9 @@ import os
 
 from deep_translator import GoogleTranslator
 from discord import File
-from discord.ext import commands, tasks
+from discord.ext import commands
 
+from ..client import Client
 from ..converters import Date
 
 
@@ -21,7 +22,7 @@ class UtilitiesCog(commands.Cog):
 
     embed_title = ":paperclip: Utilities"
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: Client) -> None:
         self.bot = bot
 
     @commands.command(
@@ -92,5 +93,5 @@ class UtilitiesCog(commands.Cog):
         os.remove(fp)
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(UtilitiesCog(bot))

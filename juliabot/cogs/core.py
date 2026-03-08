@@ -11,6 +11,7 @@ import pytz
 from discord import Message, Reaction, User
 from discord.ext import commands, tasks
 
+from ..client import Client
 from ..models import BotConfig, Server
 from ..scripts import Script
 
@@ -24,7 +25,7 @@ class CoreCog(commands.Cog, name="core"):
 
     embed_title = ":brain:Core."
 
-    def __init__(self, bot: commands.Bot) -> None:
+    def __init__(self, bot: Client) -> None:
         self.bot = bot
 
     async def _prefix(self, message: Message):
@@ -118,5 +119,5 @@ class CoreCog(commands.Cog, name="core"):
             heartbeat.update()
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: Client):
     await bot.add_cog(CoreCog(bot))

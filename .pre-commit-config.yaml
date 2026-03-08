@@ -1,20 +1,21 @@
 repos:
+- repo: https://github.com/timothycrosley/isort
+  rev: 5.13.2
+  hooks:
+    - id: isort
+      args: ["--profile", "black", "--filter-files"]
+
 - repo: https://github.com/ambv/black
   rev: 24.10.0
   hooks:
     - id: black
 
-- repo: https://github.com/timothycrosley/isort
-  rev: 5.13.2
-  hooks:
-    - id: isort
-      args: ["--profile", "black"]
-
 - repo: local
   hooks:
     - id: pytest-check
       name: pytest-check
-      entry: pytest
+      entry: python -m pytest -q
       language: system
       pass_filenames: false
       always_run: true
+      stages: [pre-push]

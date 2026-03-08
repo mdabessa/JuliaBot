@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from discord import TextChannel
@@ -10,6 +11,9 @@ from ..config import BOT_JIKAN_RATE_LIMIT
 from ..embeds.anime import anime_embed, episode_embed
 from ..models import AnimesList, AnimesNotifier, Server, User
 from ..scripts import Script
+
+
+logger = logging.getLogger(__name__)
 
 
 class AnimesCog(commands.Cog, name="animes"):
@@ -366,13 +370,13 @@ class AnimesCog(commands.Cog, name="animes"):
 
                     except Forbidden:
                         user.delete()
-                        print(f"User {user.user_id} has blocked the bot.")
+                        logger.warning(f"User {user.user_id} has blocked the bot.")
 
                     except NotFound:
-                        print(f"User {user.user_id} not found.")
+                        logger.warning(f"User {user.user_id} not found.")
 
                     except Exception as e:
-                        print(e)
+                        logger.error(f"Error sending anime notification to user {user.user_id}: {e}")
 
                 for guild in self.bot.guilds:
                     server = Server.get(str(guild.id))
@@ -387,18 +391,18 @@ class AnimesCog(commands.Cog, name="animes"):
 
                     except Forbidden:
                         server.set_anime_channel(None)
-                        print(f"Bot has no permission to send messages in {channel}")
+                        logger.warning(f"Bot has no permission to send messages in {channel}")
 
                     except NotFound:
-                        print(f"Channel {server.anime_channel} not found.")
+                        logger.warning(f"Channel {server.anime_channel} not found.")
 
                     except Exception as e:
-                        print(e)
+                        logger.error(f"Error sending anime notification to channel {server.anime_channel}: {e}")
 
                 anime.set_notified(True)
 
         except Exception as e:
-            print(e)
+            logger.error(f"Error in anime notification task: {e}")
 
 
 async def setup(bot: commands.Bot):

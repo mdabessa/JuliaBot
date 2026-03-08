@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -10,6 +11,14 @@ import heroku3
 from juliabot.config import HEROKU_API_TOKEN
 
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+
 def stop_dyno():
     conn = heroku3.from_key(HEROKU_API_TOKEN)
 
@@ -18,7 +27,7 @@ def stop_dyno():
 
     formation = app.process_formation()
     formation[0].scale(0)
-    print("Dyno stopped!")
+    logger.info("Dyno stopped!")
     time.sleep(5)
 
 
@@ -30,5 +39,5 @@ def start_dyno():
 
     formation = app.process_formation()
     formation[0].scale(1)
-    print("Dyno started!")
+    logger.info("Dyno started!")
     time.sleep(5)

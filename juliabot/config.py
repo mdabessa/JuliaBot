@@ -1,3 +1,4 @@
+import logging
 import time
 from os import environ
 
@@ -63,7 +64,25 @@ CHARACTER_LIMIT = 2000
 MESSAGE_HISTORY_LIMIT = 30
 
 
+# Setup logging
+def setup_logging():
+    """Configure logging for the bot - usa o mesmo formato do discord.py"""
+    root_logger = logging.getLogger()
+    
+    if not root_logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)-8s %(name)s %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        ))
+        root_logger.addHandler(handler)
+        root_logger.setLevel(logging.INFO)
+    
+    logging.getLogger('juliabot').setLevel(logging.INFO)
+    
+logger = logging.getLogger(__name__)
+
 try:
     time.tzset()
 except AttributeError:
-    print("tzset() not available on Windows")
+    logger.warning("tzset() not available on Windows")

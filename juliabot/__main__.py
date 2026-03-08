@@ -1,10 +1,16 @@
 import argparse
 import datetime
+import logging
 
 from .client import Client
-from .config import DISCORD_TOKEN
+from .config import DISCORD_TOKEN, setup_logging
 from .models import BotConfig, init_db
 from .utils import get_prefix
+
+
+logger = logging.getLogger(__name__)
+
+setup_logging()
 
 parser = argparse.ArgumentParser(description="JuliaBot")
 parser.add_argument(
@@ -28,7 +34,7 @@ if not args.force:
     else:
         date = datetime.datetime.strptime(heartbeat.value, "%d/%m/%Y %H:%M:%S")
         if (now - date).seconds < 60 * 5:
-            print("Bot já esta ativo!")
+            logger.warning("Bot já esta ativo!")
             exit(0)
 
 

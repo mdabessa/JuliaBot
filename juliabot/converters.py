@@ -1,4 +1,5 @@
 import datetime
+import logging
 import re
 
 import pytz
@@ -6,6 +7,9 @@ from dateutil.relativedelta import relativedelta
 from discord.ext import commands
 
 from .models import Server
+
+
+logger = logging.getLogger(__name__)
 
 STEPS = {
     "minute": ["m", "min", "minute", "minutes", "minuto", "minutos"],
@@ -73,7 +77,7 @@ class Date(commands.Converter):
         now = datetime.datetime.now().astimezone(pytz.utc)
         now = now.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")
-        print(f"{now} | Date[{argument}] -> {date_}")
+        logger.debug(f"{now} | Date[{argument}] -> {date_}")
 
         return date
 
@@ -119,7 +123,7 @@ class DeltaToDate(commands.Converter):
 
         now = start.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")
-        print(f"{now} | DeltaToDate[{argument}] -> {date_}")
+        logger.debug(f"{now} | DeltaToDate[{argument}] -> {date_}")
 
         return date
 
@@ -193,5 +197,5 @@ class NextDate(commands.Converter):
 
         now = start.strftime("%d/%m/%Y-%H:%M")
         date_ = date.strftime("%d/%m/%Y-%H:%M")
-        print(f"{now} | NextDate[{argument}] -> {date_}")
+        logger.debug(f"{now} | NextDate[{argument}] -> {date_}")
         return date

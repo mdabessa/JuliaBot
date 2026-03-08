@@ -28,7 +28,9 @@ async def test_start_play_end_game_flow(monkeypatch):
         GameResponse(game_response="Action result", grammar_correction="fixed"),
     ]
 
-    monkeypatch.setattr("juliabot.cogs.game.generate_response", lambda *a, **k: responses.pop(0))
+    monkeypatch.setattr(
+        "juliabot.cogs.game.generate_response", lambda *a, **k: responses.pop(0)
+    )
 
     sent = []
 

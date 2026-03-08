@@ -6,7 +6,6 @@ from discord.ext.commands import Bot
 
 from .models import init_db
 
-
 logger = logging.getLogger(__name__)
 
 

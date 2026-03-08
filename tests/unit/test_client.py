@@ -16,6 +16,7 @@ async def test_client_initialization_loads_cogs(monkeypatch):
         return None
 
     monkeypatch.setattr("juliabot.client.Bot.__init__", fake_bot_init)
+
     async def fake_load_extension(self, name):
         loaded.append(name)
 
@@ -23,7 +24,10 @@ async def test_client_initialization_loads_cogs(monkeypatch):
     monkeypatch.setattr(
         Path,
         "glob",
-        lambda self, pattern: [SimpleNamespace(stem="core"), SimpleNamespace(stem="help")],
+        lambda self, pattern: [
+            SimpleNamespace(stem="core"),
+            SimpleNamespace(stem="help"),
+        ],
     )
 
     client = Client(command_prefix="!")

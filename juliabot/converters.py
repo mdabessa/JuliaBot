@@ -8,7 +8,6 @@ from discord.ext import commands
 
 from .models import Server
 
-
 logger = logging.getLogger(__name__)
 
 STEPS = {

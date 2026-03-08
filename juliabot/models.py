@@ -422,7 +422,9 @@ def _auto_add_missing_simple_columns() -> List[tuple[str, str]]:
                 column_sql = CreateColumn(column).compile(dialect=engine.dialect)
                 ddl = f"ALTER TABLE {table_name} ADD COLUMN {column_sql}"
                 connection.execute(text(ddl))
-                logger.info("Auto migration applied: added %s.%s", table.name, column.name)
+                logger.info(
+                    "Auto migration applied: added %s.%s", table.name, column.name
+                )
                 applied_columns.append((table.name, column.name))
 
     return applied_columns

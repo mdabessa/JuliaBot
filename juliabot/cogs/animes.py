@@ -12,7 +12,6 @@ from ..embeds.anime import anime_embed, episode_embed
 from ..models import AnimesList, AnimesNotifier, Server, User
 from ..scripts import Script
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -376,7 +375,9 @@ class AnimesCog(commands.Cog, name="animes"):
                         logger.warning(f"User {user.user_id} not found.")
 
                     except Exception as e:
-                        logger.error(f"Error sending anime notification to user {user.user_id}: {e}")
+                        logger.error(
+                            f"Error sending anime notification to user {user.user_id}: {e}"
+                        )
 
                 for guild in self.bot.guilds:
                     server = Server.get(str(guild.id))
@@ -391,13 +392,17 @@ class AnimesCog(commands.Cog, name="animes"):
 
                     except Forbidden:
                         server.set_anime_channel(None)
-                        logger.warning(f"Bot has no permission to send messages in {channel}")
+                        logger.warning(
+                            f"Bot has no permission to send messages in {channel}"
+                        )
 
                     except NotFound:
                         logger.warning(f"Channel {server.anime_channel} not found.")
 
                     except Exception as e:
-                        logger.error(f"Error sending anime notification to channel {server.anime_channel}: {e}")
+                        logger.error(
+                            f"Error sending anime notification to channel {server.anime_channel}: {e}"
+                        )
 
                 anime.set_notified(True)
 

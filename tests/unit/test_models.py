@@ -87,7 +87,10 @@ def test_init_db_logs_summary_when_auto_migration_runs(monkeypatch):
     models.init_db()
 
     assert called["engine"] is models.engine
-    assert info_logs[-1] == "Database auto migration applied 1 column(s): servers.changelog_channel"
+    assert (
+        info_logs[-1]
+        == "Database auto migration applied 1 column(s): servers.changelog_channel"
+    )
 
 
 def test_init_db_logs_when_no_auto_migration_needed(monkeypatch):

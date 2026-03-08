@@ -1,7 +1,7 @@
 from typing import TypeVar
-from pydantic import BaseModel
 
 import instructor
+from pydantic import BaseModel
 
 
 class ResponseFormat(BaseModel):
@@ -16,11 +16,11 @@ def generate_response(
     response_format: type[T] = ResponseFormat,
 ) -> T:
     """Gera resposta da IA, opcionalmente com function calling.
-    
+
     Args:
         messages: Histórico de mensagens
         response_format: Modelo Pydantic para validar a resposta (opcional)
-    
+
     Returns:
         response - Resposta da IA, já validada pelo modelo Pydantic
     """
@@ -32,7 +32,7 @@ def generate_response(
 
     response = client.create(
         response_model=response_format,
-        messages=messages, # type: ignore
+        messages=messages,  # type: ignore
     )
 
-    return response # type: ignore
+    return response  # type: ignore

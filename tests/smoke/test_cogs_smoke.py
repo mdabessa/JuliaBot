@@ -2,7 +2,6 @@ import importlib
 
 import pytest
 
-
 COGS = [
     "juliabot.cogs.ai",
     "juliabot.cogs.animes",

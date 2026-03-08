@@ -7,7 +7,6 @@ from .config import DISCORD_TOKEN, setup_logging
 from .models import BotConfig, init_db
 from .utils import get_prefix
 
-
 logger = logging.getLogger(__name__)
 
 setup_logging()

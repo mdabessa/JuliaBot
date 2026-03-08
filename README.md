@@ -27,5 +27,22 @@ The help command can be used to get a list of all commands and can be passed a c
 ## Testing
 To run the tests, use the command `pytest` in the root directory of the repository.
 
+## Database schema updates
+On startup, the bot automatically creates missing tables and applies simple schema updates for existing tables by adding missing columns.
+The startup logs include a summary showing exactly which columns were added automatically.
+
+What is automatic:
+- New tables
+- New columns without relations
+- New non-null columns only when a `server_default` is defined
+
+What is not automatic:
+- Renames
+- Type changes
+- Removing columns
+- Foreign keys and other complex constraints
+
+For unsupported changes, use a dedicated migration tool (for example, Alembic).
+
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import List
 
@@ -97,6 +98,8 @@ class Server(Model):
     server_id = Column(String, primary_key=True)
     prefix = Column(String, default=PREFIX)
     anime_channel = Column(String)
+    changelog_channel = Column(String)
+    last_changelog_hash = Column(String)
     timezone = Column(String, default="UTC")
 
     def __init__(self, server_id: str) -> None:
@@ -132,6 +135,10 @@ class Server(Model):
             server = Server(str(server_id))
 
         return server
+
+    @classmethod
+    def get_servers_with_changelog_channel(cls) -> List[Server]:
+        return session.query(cls).filter(cls.changelog_channel != None).all()
 
 
 class Reminder(Model):

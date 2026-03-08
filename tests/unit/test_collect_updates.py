@@ -1,3 +1,5 @@
+import pytest
+
 from juliabot.collect_updates import CommitInfo, UpdateCollector
 
 
@@ -47,7 +49,7 @@ def test_get_all_commits_uses_github_when_configured(monkeypatch):
     assert calls[0][0] == "https://api.github.com/repos/owner/repo/commits"
 
 
-def test_get_all_commits_falls_back_to_git_when_github_fails(monkeypatch):
+def test_get_all_commits_raises_when_github_fails(monkeypatch):
     def fake_get(url, params, timeout):
         raise RuntimeError("network down")
 
@@ -58,10 +60,8 @@ def test_get_all_commits_falls_back_to_git_when_github_fails(monkeypatch):
     monkeypatch.setattr("juliabot.collect_updates.requests.get", fake_get)
     monkeypatch.setattr(UpdateCollector, "_fetch_commits_from_git", fake_git)
 
-    commits = UpdateCollector.get_all_commits()
-
-    assert len(commits) == 1
-    assert commits[0].message == "fix: fallback"
+    with pytest.raises(RuntimeError, match="network down"):
+        UpdateCollector.get_all_commits()
 
 
 def test_get_commits_since_hash_filters_in_memory(monkeypatch):

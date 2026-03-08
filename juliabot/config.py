@@ -4,6 +4,8 @@ from os import environ
 
 from environs import Env
 
+logger = logging.getLogger("juliabot")
+
 env = Env()
 env.read_env()
 
@@ -53,6 +55,14 @@ try:
 except KeyError:
     DEEPSEEK_API_KEY = None
 
+try:
+    GITHUB_REPOSITORY = environ["GITHUB_REPOSITORY"]
+except KeyError:
+    GITHUB_REPOSITORY = None
+
+logger.info(
+    f"Github repository configured: {GITHUB_REPOSITORY if GITHUB_REPOSITORY else 'No'}"
+)
 
 SYSTEM_PROMPT = """Você é um bot de Discord chamado JuliaBot.
 Pode usar a formatação de texto do Discord e seguir o estilo de comunicação típico do ambiente, incluindo emojis, gírias, abreviações e uma linguagem mais casual.
@@ -68,19 +78,20 @@ MESSAGE_HISTORY_LIMIT = 30
 def setup_logging():
     """Configure logging for the bot - usa o mesmo formato do discord.py"""
     root_logger = logging.getLogger()
-    
+
     if not root_logger.handlers:
         handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter(
-            '%(asctime)s %(levelname)-8s %(name)s %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        ))
+        handler.setFormatter(
+            logging.Formatter(
+                "%(asctime)s %(levelname)-8s %(name)s %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+        )
         root_logger.addHandler(handler)
         root_logger.setLevel(logging.INFO)
-    
-    logging.getLogger('juliabot').setLevel(logging.INFO)
-    
-logger = logging.getLogger(__name__)
+
+    logging.getLogger("juliabot").setLevel(logging.INFO)
+
 
 try:
     time.tzset()

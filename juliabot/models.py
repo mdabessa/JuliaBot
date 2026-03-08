@@ -236,6 +236,10 @@ class Server(Model):
         Returns:
             Server: Existing or newly created server instance.
         """
+        server = cls.select_one("server_id", str(server_id))
+
+        if server is None:
+            server = cls(server_id)
 
     @classmethod
     def get_servers_with_changelog_channel(cls) -> List[Server]:

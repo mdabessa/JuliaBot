@@ -6,7 +6,8 @@ import pytest
 from juliabot.client import Client
 
 
-def test_client_initialization_loads_cogs(monkeypatch):
+@pytest.mark.asyncio
+async def test_client_initialization_loads_cogs(monkeypatch):
     loaded = []
 
     monkeypatch.setattr("juliabot.client.init_db", lambda: None)
@@ -15,17 +16,18 @@ def test_client_initialization_loads_cogs(monkeypatch):
         return None
 
     monkeypatch.setattr("juliabot.client.Bot.__init__", fake_bot_init)
-    monkeypatch.setattr(
-        "juliabot.client.Bot.load_extension",
-        lambda self, name: loaded.append(name),
-    )
+    async def fake_load_extension(self, name):
+        loaded.append(name)
+
+    monkeypatch.setattr("juliabot.client.Bot.load_extension", fake_load_extension)
     monkeypatch.setattr(
         Path,
         "glob",
         lambda self, pattern: [SimpleNamespace(stem="core"), SimpleNamespace(stem="help")],
     )
 
-    Client(command_prefix="!")
+    client = Client(command_prefix="!")
+    await client.setup_hook()
 
     assert loaded == ["juliabot.cogs.core", "juliabot.cogs.help"]
 

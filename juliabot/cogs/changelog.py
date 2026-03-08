@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from discord.ext import commands
 
 from ..client import Client
@@ -36,7 +38,9 @@ class ChangelogCog(commands.Cog):
             embed = changelog_embed(updates, self.bot.color)
             # mudar titulo para nova atualização
             embed.title = f":tada: Nova atualização"
-            embed.description = f"Versão: {updates[0].hash} | {updates[0].date}"
+            date = updates[0].date
+            date_str = f"em {datetime.strptime(date, '%Y-%m-%d').strftime('%d/%m/%Y')}" if date else "recentemente"
+            embed.description = f"Versão: {updates[0].hash} {date_str}"
 
             await channel.send(embed=embed)
             server.last_changelog_hash = updates[0].hash

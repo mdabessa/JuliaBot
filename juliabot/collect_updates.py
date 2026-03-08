@@ -163,6 +163,34 @@ class UpdateCollector:
         return commits
     
     @staticmethod
+    def get_commits_since_hash(hash: str) -> List[CommitInfo]:
+        """Coleta commits desde um hash específico."""
+        log_format = '--pretty=format:%h|%s|%an|%ar'
+        
+        try:
+            output = UpdateCollector.run_git_command([
+                'git', 'log', f'{hash}..HEAD', log_format, '--no-merges'
+            ])
+        except:
+            return []
+        
+        if not output:
+            return []
+        
+        commits = []
+        for line in output.split('\n'):
+            if not line.strip():
+                continue
+            
+            parts = line.split('|', 3)
+            if len(parts) == 4:
+                hash, message, author, date = parts
+                commits.append(CommitInfo(hash, message, author, date))
+        
+        return commits
+
+
+    @staticmethod
     def get_last_n_commits(n: int = 10) -> List[CommitInfo]:
         """Coleta os últimos N commits."""
         log_format = '--pretty=format:%h|%s|%an|%ar'

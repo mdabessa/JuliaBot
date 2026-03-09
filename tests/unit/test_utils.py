@@ -8,7 +8,7 @@ def test_get_prefix_for_guild_message(monkeypatch):
 
     def fake_get_or_create(server_id):
         called["server_id"] = server_id
-        return SimpleNamespace(prefix="?")
+        return SimpleNamespace(prefix="?", update=lambda: None)
 
     monkeypatch.setattr(utils.Server, "get_or_create", fake_get_or_create)
 

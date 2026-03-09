@@ -241,6 +241,8 @@ class Server(Model):
         if server is None:
             server = cls(server_id)
 
+        return server
+
     @classmethod
     def get_servers_with_changelog_channel(cls) -> List[Server]:
         """Fetch all servers with a configured changelog channel.

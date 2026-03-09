@@ -23,6 +23,8 @@ def get_prefix(bot: Bot, message: Message) -> str:
     """
     if message.guild:
         server = Server.get_or_create(str(message.guild.id))
+        server.update()
+
         return server.prefix
     else:
         return PREFIX

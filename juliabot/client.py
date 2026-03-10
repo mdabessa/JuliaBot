@@ -22,10 +22,11 @@ class Client(Bot):
     embed color, and database setup, plus auto-loading of cogs from the cogs folder.
     """
 
-    def __init__(self, **options) -> None:
+    def __init__(self, test_mode: bool = False, **options) -> None:
         """Initialize the bot client with default intents and configuration.
 
         Args:
+            test_mode (bool): Whether to run in test mode.
             **options: Additional keyword arguments passed to discord.ext.commands.Bot.
         """
         intents = Intents.default()
@@ -33,6 +34,7 @@ class Client(Bot):
         super().__init__(intents=intents, **options)
 
         self.color = 0xE6DC56
+        self.test_mode = test_mode
 
         init_db()
 
@@ -65,4 +67,11 @@ class Client(Bot):
         if ctx.valid:
             logger.debug(f"Autor: {message.author} - Comando: {message.content}")
 
-        await self.process_commands(message)
+        if not message.author.bot:
+            await self.process_commands(message)
+            return
+
+        if self.test_mode:
+            ctx = await self.get_context(message)
+            if ctx.valid:
+                await self.invoke(ctx)

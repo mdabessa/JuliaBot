@@ -39,6 +39,10 @@ try:
 except KeyError:
     TZ = "UTC"
 
+try:
+    TEST_MODE = environ["TEST_MODE"].lower() == "true"
+except KeyError:
+    TEST_MODE = False
 
 # Jikan's rate limit is per IP, so the default limit (60 requests per minute) should be split across all services (DiscordBot and Scraper)
 try:

@@ -9,7 +9,7 @@ import datetime
 import logging
 
 from .client import Client
-from .config import DISCORD_TOKEN, setup_logging
+from .config import DISCORD_TOKEN, TEST_MODE, setup_logging
 from .models import BotConfig, init_db
 from .utils import get_prefix
 
@@ -45,7 +45,7 @@ if not args.force:
 
 error = None
 try:
-    bot = Client(command_prefix=get_prefix, help_command=None)
+    bot = Client(command_prefix=get_prefix, help_command=None, test_mode=TEST_MODE)
     bot.run(DISCORD_TOKEN)
 except Exception as e:
     error = e

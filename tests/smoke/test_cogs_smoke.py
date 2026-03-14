@@ -5,6 +5,7 @@ import pytest
 COGS = [
     "juliabot.cogs.ai",
     "juliabot.cogs.animes",
+    "juliabot.cogs.changelog",
     "juliabot.cogs.core",
     "juliabot.cogs.debug",
     "juliabot.cogs.error_handler",

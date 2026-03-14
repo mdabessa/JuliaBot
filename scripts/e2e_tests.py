@@ -46,6 +46,7 @@ prefix = "!"
 class E2ETestCase:
     """Declarative structure for an end-to-end command test."""
 
+    cog: str
     command: str
     description: str
     expected_response: Optional[Pattern[str]] = None
@@ -77,11 +78,13 @@ class SingleTestResult:
 
 test_cases = [
     E2ETestCase(
+        cog="core",
         command="ping",
         description="Test the ping command for a valid response.",
         expected_response=re.compile(r"ping", re.IGNORECASE),
     ),
     E2ETestCase(
+        cog="help",
         command="help",
         description="Test the help command for a valid response.",
         expected_embed=re.compile(r"lista de comandos", re.IGNORECASE),
@@ -241,6 +244,7 @@ class E2ETester(commands.Bot):
             return
 
         cmd = f"{prefix}{result.test.command}"
+        trace = f"{result.test.cog}::{result.test.command}"
         duration = f"{result.duration_seconds:.1f}s"
         expectation = self._expectation_summary(result.test)
 
@@ -249,7 +253,7 @@ class E2ETester(commands.Bot):
             await self.test_channel.send(
                 "\n".join(
                     [
-                        f"✅ **PASS** `{cmd}` in `{duration}`",
+                        f"✅ **PASS** `{cmd}` in `{duration}` | Cog: `{trace}`",
                         f"Expected: `{expectation}`",
                         f"Response: `{response}`",
                     ]
@@ -258,7 +262,7 @@ class E2ETester(commands.Bot):
             return
 
         lines = [
-            f"❌ **FAIL** `{cmd}` after `{duration}`",
+            f"❌ **FAIL** `{cmd}` after `{duration}` | Cog: `{trace}`",
             f"Expected: `{expectation}`",
             f"Reason: {result.reason}",
         ]
@@ -292,7 +296,7 @@ class E2ETester(commands.Bot):
             for failure in failures:
                 cmd = f"{prefix}{failure.test.command}"
                 summary_lines.append(
-                    f"- `{cmd}` ({failure.duration_seconds:.1f}s, {failure.attempts} msgs): {self._truncate_text(failure.reason, limit=180)}"
+                    f"- `{failure.test.cog}::{failure.test.command}` / `{cmd}` ({failure.duration_seconds:.1f}s, {failure.attempts} msgs): {self._truncate_text(failure.reason, limit=180)}"
                 )
         else:
             summary_lines.append("\nNo failures detected.")

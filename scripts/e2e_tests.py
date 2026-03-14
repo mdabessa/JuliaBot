@@ -300,9 +300,30 @@ class E2ETester(commands.Bot):
         await self.test_channel.send("\n".join(summary_lines))
 
     async def _run_single_test(self, test: E2ETestCase) -> bool:
-        """Run one command test from send-command to assertion."""
+        """Run one command test from send-command to assertion.
+
+        Listeners are registered BEFORE the command is sent to avoid the race
+        condition where the target bot replies before ``wait_for`` is active.
+        Both ``on_message`` and ``on_message_edit`` are watched so that bots
+        that send a placeholder and later edit it are handled correctly.
+        """
         if self.test_channel is None:
             raise RuntimeError("Test channel is not initialized.")
+
+        # ── build a queue that receives relevant messages/edits eagerly ──────
+        queue: asyncio.Queue[discord.Message] = asyncio.Queue()
+
+        async def _on_msg(message: discord.Message) -> None:
+            if self._is_expected_response_author(message):
+                queue.put_nowait(message)
+
+        async def _on_edit(_before: discord.Message, after: discord.Message) -> None:
+            if self._is_expected_response_author(after):
+                queue.put_nowait(after)
+
+        # Register BEFORE sending the command → no race condition possible
+        self.add_listener(_on_msg, "on_message")
+        self.add_listener(_on_edit, "on_message_edit")
 
         await self.test_channel.send(
             f"🧪 Running `{prefix}{test.command}`: {test.description}"
@@ -313,9 +334,6 @@ class E2ETester(commands.Bot):
         mismatch_reasons: list[str] = []
         attempts = 0
 
-        def author_check(message: discord.Message) -> bool:
-            return self._is_expected_response_author(message)
-
         try:
             loop = asyncio.get_running_loop()
             deadline = loop.time() + test.timeout_seconds
@@ -325,9 +343,7 @@ class E2ETester(commands.Bot):
                 if timeout_left <= 0:
                     raise asyncio.TimeoutError
 
-                candidate = await self.wait_for(
-                    "message", check=author_check, timeout=timeout_left
-                )
+                candidate = await asyncio.wait_for(queue.get(), timeout=timeout_left)
                 attempts += 1
 
                 if message_matches_test(candidate, test):
@@ -347,7 +363,8 @@ class E2ETester(commands.Bot):
                     return True
 
                 mismatch_reasons.append(
-                    f"{self._format_response_preview(candidate)} -> {self._message_mismatch_reason(candidate, test)}"
+                    f"{self._format_response_preview(candidate)} -> "
+                    f"{self._message_mismatch_reason(candidate, test)}"
                 )
 
                 if self.verbose:
@@ -361,11 +378,14 @@ class E2ETester(commands.Bot):
             duration = (datetime.now() - start).total_seconds()
             attempts_text = f"{attempts} candidate response(s) seen"
             if attempts == 0:
-                reason = f"timeout after {test.timeout_seconds:.0f}s with no response from target bot"
+                reason = (
+                    f"timeout after {test.timeout_seconds:.0f}s with no response "
+                    "from target bot"
+                )
             else:
                 reason = (
-                    f"timeout after {test.timeout_seconds:.0f}s; no response matched expectation "
-                    f"({attempts_text})"
+                    f"timeout after {test.timeout_seconds:.0f}s; no response matched "
+                    f"expectation ({attempts_text})"
                 )
 
             result = SingleTestResult(
@@ -380,6 +400,11 @@ class E2ETester(commands.Bot):
             await self._send_test_result_message(result)
             self.results.failed += 1
             return False
+
+        finally:
+            # Always remove listeners so they don't bleed into the next test
+            self.remove_listener(_on_msg, "on_message")
+            self.remove_listener(_on_edit, "on_message_edit")
 
     async def on_message(self, message: discord.Message):
         # Ignore messages from ourselves

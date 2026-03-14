@@ -55,7 +55,10 @@ async def test_on_message_processes_commands(monkeypatch):
     client.get_context = fake_get_context
     client.process_commands = fake_process_commands
 
-    message = SimpleNamespace(author="u", content="!ping")
+    message = SimpleNamespace(
+        author=SimpleNamespace(bot=False, __str__=lambda self: "u"),
+        content="!ping",
+    )
     await client.on_message(message)
 
     assert calls == ["!ping"]

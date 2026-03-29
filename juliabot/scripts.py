@@ -18,6 +18,7 @@ class Script:
     per name.
     """
 
+    index = 0
     functions: List[Dict[str, Any]] = []
     scripts: List[Script] = []
 

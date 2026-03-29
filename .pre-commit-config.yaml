@@ -14,7 +14,7 @@ repos:
   hooks:
     - id: pytest-check
       name: pytest-check
-      entry: python -m pytest -q
+      entry: .venv/bin/python -m pytest -q
       language: system
       pass_filenames: false
       always_run: true

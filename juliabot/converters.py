@@ -249,22 +249,27 @@ class NextDate(commands.Converter):
 
             times[step] = (res[0], False)
 
+        steps = list(STEPS_.keys())
+
         for step, (num, _) in times.items():
             date += relativedelta(**{step: num})
 
-            if (date < start) or ((date == start) and (step == "minute")):
-                index = list(STEPS_.keys()).index(step)
+            index = steps.index(step)
 
+            finer_pending = any(not times[other][1] for other in steps[:index])
+
+            if (date < start) or (date == start and not finer_pending):
                 while True:
                     index += 1
 
-                    if index == len(STEPS_):
+                    if index == len(steps):
                         raise Exception("Data não pode ser menor que a data atual")
 
-                    if not times[list(STEPS_.keys())[index]][1]:  # if fixed go to next
+
+                    if not times[steps[index]][1]:
                         continue
 
-                    next_step = list(STEPS_.keys())[index]
+                    next_step = steps[index]
                     date += relativedelta(**{next_step + "s": 1})
                     break
 

@@ -391,12 +391,27 @@ async def _run_animes_search_anime(
 
     await animes_module.AnimesCog.search_anime.callback(cog, ctx, anime="Frieren")
 
+    name, function_name, time_out = script_calls[0]
+
     assert (
-        script_calls[0][1] == "search_anime"
-    ), "animes::search_anime should execute the pagination script"
+        name == f"{ctx.author.id}_search_anime"
+    ), "animes::search_anime should scope the session to the command author"
     assert (
-        script_calls[1]["ctx"] is ctx
-    ), "animes::search_anime should pass the command context to the script"
+        function_name == "search_anime"
+    ), "animes::search_anime should spawn the search_anime session"
+    assert time_out == 300, "animes::search_anime should idle out after 300s"
+
+    spawn_kwargs = script_calls[1]
+
+    assert (
+        spawn_kwargs["ctx"] is ctx
+    ), "animes::search_anime should pass the command context to the session"
+    assert (
+        spawn_kwargs["dubbed"] is False
+    ), "animes::search_anime should default to subtitled results"
+    assert (
+        spawn_kwargs["anime_search"] is not None
+    ), "animes::search_anime should pass the searched animes to the session"
 
 
 async def _run_animes_anime_list(
@@ -422,9 +437,27 @@ async def _run_animes_anime_list(
 
     await animes_module.AnimesCog.anime_list.callback(cog, ctx, user=None)
 
+    name, function_name, time_out = script_calls[0]
+
     assert (
-        script_calls[0][1] == "anime_list"
-    ), "animes::anime_list should execute the watchlist script when entries exist"
+        name == f"{ctx.author.id}_anime_list"
+    ), "animes::anime_list should scope the session to the command author"
+    assert (
+        function_name == "anime_list"
+    ), "animes::anime_list should spawn the anime_list session"
+    assert time_out == 300, "animes::anime_list should idle out after 300s"
+
+    spawn_kwargs = script_calls[1]
+
+    assert (
+        spawn_kwargs["ctx"] is ctx
+    ), "animes::anime_list should pass the command context to the session"
+    assert spawn_kwargs[
+        "animes"
+    ], "animes::anime_list should pass the user watchlist to the session"
+    assert (
+        spawn_kwargs["jikan"] is cog.jikan
+    ), "animes::anime_list should pass the Jikan client to the session"
 
 
 async def _run_animes_add_anime(
@@ -696,6 +729,9 @@ async def _run_fun_duel(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> Non
         f"duel_{ctx.guild.id}",
         "duel",
     ), "fun::duel should start the duel script with a guild-scoped key"
+    assert (
+        script_calls[1]["message"] is ctx.message
+    ), "fun::duel should pass the challenge message to the duel session"
 
 
 async def _run_fun_dice(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
@@ -796,9 +832,27 @@ async def _run_reminder_list(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -
 
     await reminder_module._ReminderCog.list_reminders.callback(cog, ctx)
 
+    name, function_name, time_out = script_calls[0]
+
     assert (
-        script_calls[0][1] == "list_reminders"
-    ), "reminder::list_reminders should execute the interactive reminder script"
+        name == f"{ctx.author.id}_list_reminders"
+    ), "reminder::list_reminders should scope the session to the command author"
+    assert (
+        function_name == "list_reminders"
+    ), "reminder::list_reminders should spawn the list_reminders session"
+    assert time_out == 180, "reminder::list_reminders should idle out after 180s"
+
+    spawn_kwargs = script_calls[1]
+
+    assert (
+        spawn_kwargs["ctx"] is ctx
+    ), "reminder::list_reminders should pass the command context to the session"
+    assert (
+        spawn_kwargs["bot"] is bot
+    ), "reminder::list_reminders should pass the bot instance to the session"
+    assert spawn_kwargs[
+        "reminders"
+    ], "reminder::list_reminders should pass the user reminders to the session"
 
 
 async def _run_reminder_remind_me(

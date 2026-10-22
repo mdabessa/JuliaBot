@@ -11,6 +11,8 @@ from discord import Game, Intents, Message
 from discord.ext.commands import Bot
 
 from .models import init_db
+from .sessions import Registry, SessionManager
+from .sessions.transports import MessageTransport, ReactionTransport
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,9 @@ class Client(Bot):
 
         self.color = 0xE6DC56
         self.test_mode = test_mode
+        self.sessions = SessionManager(Registry())
+        self.session_messages = MessageTransport(self.sessions)
+        self.session_reactions = ReactionTransport(self.sessions)
 
         init_db()
 
@@ -44,6 +49,11 @@ class Client(Bot):
         Called during bot initialization to dynamically discover and load
         all modules in juliabot/cogs/.
         """
+        if not hasattr(self, "sessions"):
+            self.sessions = SessionManager(Registry())
+            self.session_messages = MessageTransport(self.sessions)
+            self.session_reactions = ReactionTransport(self.sessions)
+
         cogs = [file.stem for file in Path("juliabot", "cogs").glob("*.py")]
         for extension in cogs:
             await self.load_extension(f"juliabot.cogs.{extension}")

@@ -33,6 +33,7 @@ class SessionManager:
         self.store = store or MemoryStore()
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._sessions_by_key: dict[str, Session] = {}
+        self._sessions_by_id: dict[str, Session] = {}
 
     def _now(self) -> datetime:
         """Return an aware UTC timestamp from the manager clock."""
@@ -61,7 +62,7 @@ class SessionManager:
 
         candidates = [
             session
-            for session in self._sessions_by_key.values()
+            for session in self._sessions_by_id.values()
             if session.registration.name == name
             and session.scope_key == self._runtime_scope_key(registration, event)
         ]
@@ -79,6 +80,8 @@ class SessionManager:
             clock=self._clock,
         )
         self._sessions_by_key[event.key] = session
+        self._sessions_by_id[session.id] = session
+        self._sessions_by_key[session.id] = session
         session.mark_hydrated()
 
         try:
@@ -159,11 +162,17 @@ class SessionManager:
             await self.store.save(session)
         return True
 
+    def get(self, key: str) -> Session | None:
+        """Return a live session by routing key or session id."""
+        return self._sessions_by_key.get(key)
+
     async def close(self, session: Session) -> None:
         """Close a live session and remove its persisted snapshot."""
         await session.close()
-        if self._sessions_by_key.get(session.routing_key) is session:
-            del self._sessions_by_key[session.routing_key]
+        self._sessions_by_id.pop(session.id, None)
+        for key, candidate in tuple(self._sessions_by_key.items()):
+            if candidate is session:
+                del self._sessions_by_key[key]
         if session.registration.resumable:
             await self.store.delete(session.id)
 
@@ -172,7 +181,7 @@ class SessionManager:
         now = self._now()
         expired = [
             session
-            for session in self._sessions_by_key.values()
+            for session in self._sessions_by_id.values()
             if session.is_expired(now)
         ]
         for session in expired:
@@ -182,4 +191,4 @@ class SessionManager:
 
     def active(self) -> tuple[Session, ...]:
         """Return a stable snapshot of live sessions for diagnostics."""
-        return tuple(self._sessions_by_key.values())
+        return tuple(self._sessions_by_id.values())

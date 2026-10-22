@@ -45,12 +45,26 @@ class DebugCog(commands.Cog):
         aliases=["get_scripts"],
     )
     async def get_all_scripts(self, ctx: commands.Context):
+        sessions = getattr(self.bot, "sessions", None)
+        active_sessions = sessions.active() if sessions is not None else ()
+        if active_sessions:
+            for session in active_sessions:
+                await ctx.send(
+                    f"```Nome: {session.registration.name}\n"
+                    f"ID: {session.id}\n"
+                    f"Payload: {session.to_payload()}```"
+                )
+            return
+
+        # Existing cogs still use Script until their migration phases. Keep the
+        # diagnostic command useful during that transition.
         scripts = Script.get_scripts()
-        if scripts:
-            for script in scripts:
-                await ctx.send(f"```Nome: {script.name}\nCache:{script.cache}```")
-        else:
+        if not scripts:
             await ctx.send("Nenhum script rodando no momento.")
+            return
+
+        for script in scripts:
+            await ctx.send(f"```Nome: {script.name}\nCache:{script.cache}```")
 
     @commands.command(
         name="exec",

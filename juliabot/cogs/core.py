@@ -1,7 +1,7 @@
 """Core bot commands cog.
 
-Provides essential bot commands like ping, prefix display, time, and script
-timeout management.
+Provides essential bot commands like ping, prefix display, time, and session
+dispatch.
 """
 
 from datetime import datetime
@@ -20,7 +20,7 @@ class CoreCog(commands.Cog, name="core"):
     """Core bot functionality.
 
     Provides essential commands: ping, prefix lookup, current time display,
-    message repeating, and script timeout management.
+    message repeating, and session event dispatch.
     """
 
     embed_title = ":brain:Core."
@@ -80,12 +80,17 @@ class CoreCog(commands.Cog, name="core"):
     @commands.Cog.listener()
     async def on_ready(self):
         self.scripts_time_out.start()
+        self.sessions_time_out.start()
         self.update_hearbeat.start()
 
     @commands.Cog.listener()
     async def on_message(self, message: Message):
         if message.content == self.bot.user.mention:
             await self._prefix(message)
+
+        message_transport = getattr(self.bot, "session_messages", None)
+        if message_transport is not None:
+            await message_transport.dispatch(message)
 
         for scr in Script.fetch_script("on_message", by="events", _in="function"):
             await scr.execute(message=message)
@@ -95,17 +100,29 @@ class CoreCog(commands.Cog, name="core"):
         if self.bot.user == user:
             return
 
+        reaction_transport = getattr(self.bot, "session_reactions", None)
+        if reaction_transport is not None:
+            await reaction_transport.dispatch(reaction, user)
+
         scr = Script.fetch_script(reaction.message, by="message", _in="cache")
         if scr and "on_reaction_add" in scr[0].func["events"]:
             await scr[0].execute(user=user, emoji=reaction.emoji)
 
     @tasks.loop(seconds=30, reconnect=True)
     async def scripts_time_out(self):
+        """Expire legacy Script instances during the migration period."""
         now = datetime.now()
         for script in Script.get_scripts().copy():
             diff = now - script.last_execute
             if diff.total_seconds() >= script.time_out:
                 script.close()
+
+    @tasks.loop(seconds=30, reconnect=True)
+    async def sessions_time_out(self):
+        """Expire framework sessions through their manager."""
+        sessions = getattr(self.bot, "sessions", None)
+        if sessions is not None:
+            await sessions.sweep()
 
     @tasks.loop(seconds=60)
     async def update_hearbeat(self):

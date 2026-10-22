@@ -89,6 +89,16 @@ async def test_start_dispatch_and_close():
 
 
 @pytest.mark.asyncio
+async def test_session_id_alias_dispatches_the_same_live_session():
+    manager = manager_for(registration())
+    session = await manager.start("managed", event("message-1"))
+
+    assert manager.get(session.id) is session
+    assert await manager.dispatch(event(session.id, action="open")) is True
+    assert session.to_payload()["opened_by"] == 1
+
+
+@pytest.mark.asyncio
 async def test_unknown_key_returns_without_store_calls(counting_store):
     manager = manager_for(registration(), counting_store)
 

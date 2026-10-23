@@ -305,7 +305,7 @@ def _make_animes_cog(monkeypatch: pytest.MonkeyPatch, bot: FakeBot):
         def __init__(self, rate_limit=None):
             self.rate_limit = rate_limit
 
-        async def search_anime(self, search_type, query):
+        async def search_anime(self, search_type, query, page=1):
             raise AssertionError(f"unexpected search_anime call for {query}")
 
         async def get_anime(self, mal_id):
@@ -384,44 +384,35 @@ async def _run_animes_search_anime(
 ) -> None:
     bot, ctx = _make_ctx(content="!search_anime frieren")
     cog = _make_animes_cog(monkeypatch, bot)
-    script_calls = []
+    ctx.cog = cog
 
-    class FakeScript:
-        def __init__(self, name, function_name, time_out):
-            script_calls.append((name, function_name, time_out))
+    async def fake_search_anime(search_type, query, page=1):
+        return SimpleNamespace(
+            data=[SimpleNamespace(mal_id=1, title="Frieren")],
+            pagination=SimpleNamespace(has_next_page=False, current_page=page),
+        )
 
-        async def execute(self, **kwargs):
-            script_calls.append(kwargs)
+    def fake_anime_embed(anime, _color):
+        return Embed(title=anime.title)
 
-    async def fake_search_anime(search_type, query):
-        return SimpleNamespace(data=[SimpleNamespace(mal_id=1, title="Frieren")])
-
-    monkeypatch.setattr(animes_module, "Script", FakeScript)
+    monkeypatch.setattr(animes_module, "anime_embed", fake_anime_embed)
     cog.jikan.search_anime = fake_search_anime
 
     await animes_module.AnimesCog.search_anime.callback(cog, ctx, anime="Frieren")
 
-    name, function_name, time_out = script_calls[0]
+    sessions = bot.sessions.active()
 
-    assert (
-        name == f"{ctx.author.id}_search_anime"
-    ), "animes::search_anime should scope the session to the command author"
-    assert (
-        function_name == "search_anime"
-    ), "animes::search_anime should spawn the search_anime session"
-    assert time_out == 300, "animes::search_anime should idle out after 300s"
-
-    spawn_kwargs = script_calls[1]
-
-    assert (
-        spawn_kwargs["ctx"] is ctx
-    ), "animes::search_anime should pass the command context to the session"
-    assert (
-        spawn_kwargs["dubbed"] is False
-    ), "animes::search_anime should default to subtitled results"
-    assert (
-        spawn_kwargs["anime_search"] is not None
-    ), "animes::search_anime should pass the searched animes to the session"
+    assert len(sessions) == 1
+    session = sessions[0]
+    assert session.registration.name == animes_module.ANIME_SEARCH
+    assert session.registration.timeout == 300
+    assert session.to_payload() == {
+        "index": 0,
+        "query": "Frieren",
+        "jikan_page": 1,
+        "dubbed": False,
+    }
+    assert ctx.reply_messages[0].view is not None
 
 
 async def _run_animes_anime_list(
@@ -429,45 +420,36 @@ async def _run_animes_anime_list(
 ) -> None:
     bot, ctx = _make_ctx(content="!anime_list")
     cog = _make_animes_cog(monkeypatch, bot)
-    script_calls = []
+    ctx.cog = cog
 
-    class FakeScript:
-        def __init__(self, name, function_name, time_out):
-            script_calls.append((name, function_name, time_out))
+    async def fake_get_anime(mal_id):
+        return SimpleNamespace(mal_id=mal_id, title=f"Anime {mal_id}")
 
-        async def execute(self, **kwargs):
-            script_calls.append(kwargs)
+    def fake_anime_embed(anime, _color):
+        return Embed(title=anime.title)
 
-    monkeypatch.setattr(animes_module, "Script", FakeScript)
+    monkeypatch.setattr(animes_module, "anime_embed", fake_anime_embed)
     monkeypatch.setattr(
         animes_module.AnimesList,
         "get_user",
         lambda user_id: [SimpleNamespace(user_id=str(user_id), mal_id=1, dubbed=False)],
     )
+    cog.jikan.get_anime = fake_get_anime
 
     await animes_module.AnimesCog.anime_list.callback(cog, ctx, user=None)
 
-    name, function_name, time_out = script_calls[0]
+    sessions = bot.sessions.active()
 
-    assert (
-        name == f"{ctx.author.id}_anime_list"
-    ), "animes::anime_list should scope the session to the command author"
-    assert (
-        function_name == "anime_list"
-    ), "animes::anime_list should spawn the anime_list session"
-    assert time_out == 300, "animes::anime_list should idle out after 300s"
+    assert len(sessions) == 1
+    session = sessions[0]
+    assert session.registration.name == animes_module.ANIME_LIST
+    assert session.registration.timeout == 300
 
-    spawn_kwargs = script_calls[1]
+    await session.wait_for_loading()
 
-    assert (
-        spawn_kwargs["ctx"] is ctx
-    ), "animes::anime_list should pass the command context to the session"
-    assert spawn_kwargs[
-        "animes"
-    ], "animes::anime_list should pass the user watchlist to the session"
-    assert (
-        spawn_kwargs["jikan"] is cog.jikan
-    ), "animes::anime_list should pass the Jikan client to the session"
+    assert session.to_payload() == {"index": 0, "target_user_id": ctx.author.id}
+    assert ctx.reply_messages[0].view is not None
+    assert ctx.reply_messages[0].edits[-1]["embed"].footer.text == "Animes: 1/1"
 
 
 async def _run_animes_add_anime(

@@ -12,11 +12,7 @@ from discord.ext.commands import Bot
 
 from .models import init_db
 from .sessions import PostgresStore, Registry, SessionManager
-from .sessions.transports import (
-    MessageTransport,
-    ReactionTransport,
-    restore_button_views,
-)
+from .sessions.transports import MessageTransport, restore_button_views
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +39,6 @@ class Client(Bot):
         self.test_mode = test_mode
         self.sessions = SessionManager(Registry(), PostgresStore())
         self.session_messages = MessageTransport(self.sessions)
-        self.session_reactions = ReactionTransport(self.sessions)
 
         init_db()
 
@@ -56,7 +51,6 @@ class Client(Bot):
         if not hasattr(self, "sessions"):
             self.sessions = SessionManager(Registry(), PostgresStore())
             self.session_messages = MessageTransport(self.sessions)
-            self.session_reactions = ReactionTransport(self.sessions)
 
         cogs = [file.stem for file in Path("juliabot", "cogs").glob("*.py")]
         for extension in cogs:

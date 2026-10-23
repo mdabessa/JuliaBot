@@ -5,7 +5,7 @@ import pytest
 
 from juliabot.client import Client
 from juliabot.sessions import MemoryStore, SessionManager
-from juliabot.sessions.transports import MessageTransport, ReactionTransport
+from juliabot.sessions.transports import MessageTransport
 
 
 @pytest.mark.asyncio
@@ -39,7 +39,6 @@ async def test_client_initialization_loads_cogs(monkeypatch):
     assert loaded == ["juliabot.cogs.core", "juliabot.cogs.help"]
     assert isinstance(client.sessions, SessionManager)
     assert isinstance(client.session_messages, MessageTransport)
-    assert isinstance(client.session_reactions, ReactionTransport)
 
 
 @pytest.mark.asyncio

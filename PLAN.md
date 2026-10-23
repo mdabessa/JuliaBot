@@ -579,6 +579,41 @@ registry.register(Registration(
 **Exit criteria:** no animes session holds a Jikan response, anime object list, or ORM rows in its
 payload; both sessions survive a simulated store round-trip; behavior matches the Phase 0 contract.
 
+#### Phase 4 implementation note
+
+Measured delta: `juliabot/cogs/animes.py` grew from 351 to 419 lines (+68) while removing both
+cache-driven handlers (`search_anime` and `_anime_list`, ~290 lines combined) and adding two typed
+session classes. The growth is declarative surface, not interaction logic: the status/cache branches
+are gone and the shared behavior lives in `PaginationSession`.
+
+Deviations from the plan, and why:
+
+1. **`anime_list` payload is `{index, target_user_id}`, not `{index, mal_ids}`.** The watchlist is
+   DB-backed and the command may open *another user's* list (`!anime_list @user`), so the DB is the
+   source of truth for which rows exist, their `dubbed` flag, and the row to delete. Storing
+   `mal_ids` would duplicate state that can go stale, and would lose the row identity needed for
+   deletion. `load_items()` re-reads `AnimesList.get_user(target_user_id)` and re-fetches Jikan
+   details, so `hydrate()` is covered by the same path.
+2. **Search payload matches the plan** (`{index, query, jikan_page, dubbed}`), with boundaries driven
+   by `AnimeSearch.pagination.has_next_page` and `current_page`.
+3. **Runtime dependencies are read from the invoking context, never persisted:**
+   `event.raw.cog.jikan` and `event.raw.bot.color`. This reuses the `Context` already carried by
+   `InteractionEvent.raw` (the same mechanism Phase 3 used for the bot instance) instead of adding a
+   dependency-injection API to the manager.
+4. **`PaginationSession` gained three capabilities** required by these two sessions:
+   `load_more(direction)` for remote page boundaries, progressive loading
+   (`progressive`, `iter_items()`, `on_loading_finished()`), and `delete_item() -> bool` so a
+   session can refuse a removal (used for "only the list owner may delete").
+5. **Old owner-only rule preserved exactly:** the ❌ action is declared `owner_only=False`, and
+   `delete_item` checks `entry.user_id` against the acting user. Restricting the *action* to the
+   invoker would have changed behavior when viewing someone else's list.
+6. **Emoji reactions became persistent buttons** (decision 3), and the first message uses
+   `ctx.reply(...)` instead of `ctx.send(...)`, matching the Phase 3 pattern.
+
+Still-open item for Phase 6: `expires_at`/`payload` persistence is not exercised yet because
+`MemoryStore` is only used by tests; the exit criterion "survive a simulated store round-trip" is
+deferred to the Postgres store phase, where `hydrate()` is actually invoked.
+
 ---
 
 ### Phase 5 — Prompt pattern + `duel`

@@ -7,6 +7,8 @@ global bucket, so a busy channel never scans unrelated rules.
 
 from __future__ import annotations
 
+from discord import HTTPException
+
 from ..session import Session
 from ..transports.buttons import build_button_view
 from ..types import Action, InteractionEvent
@@ -81,6 +83,29 @@ class ChannelEntryPointRule(MessageRuleSession):
 
     async def disable(self, event: InteractionEvent) -> None:
         """Remove the anchor controls and close the rule."""
-        if self._anchor is not None:
-            await self._anchor.edit(content=self.disabled_text, view=None)
-        await self.close()
+        await self.shutdown()
+
+    async def shutdown(self, channel=None) -> None:
+        """Remove the anchor controls and close the rule.
+
+        A restored rule has no live anchor object, so an optional channel is
+        used to fetch the anchor by its persisted id before editing it. Closing
+        goes through the manager when available so the channel index and the
+        persisted snapshot are dropped too.
+        """
+        anchor = self._anchor
+        if anchor is None and channel is not None:
+            anchor_id = self.to_payload().get("anchor_message_id")
+            if isinstance(anchor_id, int):
+                try:
+                    anchor = await channel.fetch_message(anchor_id)
+                except HTTPException:
+                    anchor = None
+
+        if anchor is not None:
+            await anchor.edit(content=self.disabled_text, view=None)
+
+        if self.manager is not None:
+            await self.manager.close(self)
+        else:
+            await self.close()

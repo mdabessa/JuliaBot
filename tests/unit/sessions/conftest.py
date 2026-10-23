@@ -1,10 +1,8 @@
 """Shared fixtures for the session framework tests.
 
-Everything here is deliberately independent of ``juliabot.sessions`` so the
-fixtures can be used while the framework is still being built (phase 1). The
-``CountingStore`` double is duck-typed rather than a subclass so it keeps working
-as the store protocol evolves, and it records every call so tests can assert the
-dispatch efficiency rules (no store traffic for unrelated events).
+``CountingStore`` is a ``MemoryStore`` that records every call, so tests can
+assert the dispatch efficiency rules (no store traffic for unrelated events)
+while still exercising real snapshot semantics.
 """
 
 from __future__ import annotations
@@ -14,6 +12,8 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+
+from juliabot.sessions import MemoryStore
 
 
 class FakeClock:
@@ -49,15 +49,11 @@ class FakeClient:
         self.views.append(view)
 
 
-class CountingStore:
-    """Duck-typed ``SessionStore`` double that records every call.
+class CountingStore(MemoryStore):
+    """In-memory store that records every call for efficiency assertions."""
 
-    Args:
-        records: Initial session records keyed by session id.
-    """
-
-    def __init__(self, records: dict[str, Any] | None = None) -> None:
-        self.records: dict[str, Any] = dict(records or {})
+    def __init__(self) -> None:
+        super().__init__()
         self.calls: list[str] = []
         self.purged = 0
 
@@ -65,30 +61,30 @@ class CountingStore:
         """Return how many times ``name`` was called."""
         return self.calls.count(name)
 
-    async def load_keys(self) -> list[Any]:
-        """Return the stored routing keys."""
+    async def load_keys(self):
+        """Return stored records, recording the call."""
         self.calls.append("load_keys")
-        return list(self.records.values())
+        return await super().load_keys()
 
-    async def load(self, session_id: str) -> Any | None:
-        """Return a single stored record."""
+    async def load(self, session_id: str):
+        """Return one stored record, recording the call."""
         self.calls.append("load")
-        return self.records.get(session_id)
+        return await super().load(session_id)
 
-    async def save(self, session: Any) -> None:
-        """Persist a record, keyed by its id."""
+    async def save(self, session) -> None:
+        """Persist a session snapshot, recording the call."""
         self.calls.append("save")
-        self.records[session.id] = session
+        await super().save(session)
 
     async def delete(self, session_id: str) -> None:
-        """Remove a record."""
+        """Delete a record, recording the call."""
         self.calls.append("delete")
-        self.records.pop(session_id, None)
+        await super().delete(session_id)
 
     async def purge_expired(self, now: datetime) -> int:
-        """Pretend to drop expired records and report the count."""
+        """Purge expired records, recording the call and count."""
         self.calls.append("purge_expired")
-        self.purged = 0
+        self.purged = await super().purge_expired(now)
         return self.purged
 
 

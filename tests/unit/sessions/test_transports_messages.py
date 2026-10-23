@@ -1,4 +1,4 @@
-"""Tests for the Phase 2 message transport boundary."""
+"""Tests for the message transport."""
 
 from types import SimpleNamespace
 
@@ -9,18 +9,34 @@ from juliabot.sessions.transports.messages import MessageTransport
 
 
 @pytest.mark.asyncio
-async def test_message_transport_is_a_noop_until_message_rules_exist(counting_store):
+async def test_message_transport_returns_zero_without_rules(counting_store):
     manager = SessionManager(Registry(), counting_store)
     transport = MessageTransport(manager)
     message = SimpleNamespace(
         id=77,
-        author=SimpleNamespace(id=3),
+        author=SimpleNamespace(id=3, bot=False),
         guild=SimpleNamespace(id=10),
         channel=SimpleNamespace(id=20),
         content="hello",
     )
 
-    assert await transport.dispatch(message) is False
+    assert await transport.dispatch(message) == 0
+    assert counting_store.calls == []
+
+
+@pytest.mark.asyncio
+async def test_message_transport_ignores_bot_messages(counting_store):
+    manager = SessionManager(Registry(), counting_store)
+    transport = MessageTransport(manager)
+    message = SimpleNamespace(
+        id=77,
+        author=SimpleNamespace(id=999, bot=True),
+        guild=SimpleNamespace(id=10),
+        channel=SimpleNamespace(id=20),
+        content="hello",
+    )
+
+    assert await transport.dispatch(message) == 0
     assert counting_store.calls == []
 
 

@@ -1,8 +1,8 @@
-"""Message transport boundary for future message-triggered sessions.
+"""Message transport for channel message rules.
 
-Phase 2 deliberately does not start sessions from messages. Phase 7 adds
-message-rule registrations; keeping this adapter now gives the bot one stable
-transport boundary without adding a per-message store query.
+Every human message is delivered to the rules indexed for its channel. The
+transport performs no store access: rules are either live in RAM or
+materialized once from the boot-time key index.
 """
 
 from __future__ import annotations
@@ -14,13 +14,13 @@ from ..types import InteractionEvent, TriggerType
 
 
 class MessageTransport:
-    """Normalize message context while message rules are not yet enabled."""
+    """Normalize message context and deliver it to channel rules."""
 
     def __init__(self, manager: SessionManager):
         self.manager = manager
 
     def event(self, message: Message) -> InteractionEvent:
-        """Build the normalized event that Phase 7 rules will consume."""
+        """Build the normalized event consumed by message rules."""
         return InteractionEvent(
             transport=TriggerType.MESSAGE,
             key=str(message.id),
@@ -31,7 +31,12 @@ class MessageTransport:
             raw=message,
         )
 
-    async def dispatch(self, message: Message) -> bool:
-        """Ignore messages until message-rule registrations are implemented."""
-        self.event(message)
-        return False
+    async def dispatch(self, message: Message) -> int:
+        """Deliver a human message to the rules for its channel.
+
+        Returns how many rules handled it. Bot messages are ignored so a rule
+        reacting with its own message cannot loop.
+        """
+        if getattr(message.author, "bot", False):
+            return 0
+        return await self.manager.dispatch_message(self.event(message))

@@ -37,13 +37,31 @@ async def test_counting_store_records_every_call(counting_store):
 
 
 @pytest.mark.asyncio
-async def test_counting_store_round_trips_records(counting_store):
-    session = type("Session", (), {"id": "abc"})()
+async def test_counting_store_delegates_snapshot_semantics(counting_store):
+    from juliabot.sessions import (
+        InteractionEvent,
+        Registration,
+        Scope,
+        Session,
+        TriggerType,
+    )
+
+    class CountedSession(Session):
+        pass
+
+    session = CountedSession(
+        Registration(
+            name="counted",
+            session_class=CountedSession,
+            trigger=TriggerType.COMPONENT,
+            scope=Scope.USER,
+        ),
+        InteractionEvent(transport=TriggerType.COMPONENT, key="key-1", user_id=1),
+    )
 
     await counting_store.save(session)
 
-    assert await counting_store.load("abc") is session
-
-    await counting_store.delete("abc")
-
-    assert await counting_store.load("abc") is None
+    record = await counting_store.load(session.id)
+    assert counting_store.count("save") == 1
+    assert record is not None
+    assert record.routing_key == "key-1"

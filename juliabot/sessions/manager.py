@@ -13,7 +13,7 @@ from typing import Callable
 from .registry import Registry
 from .session import Session
 from .store import MemoryStore, SessionStore, StoredSession
-from .types import InteractionEvent, JSONValue
+from .types import InteractionEvent, JSONValue, TriggerType
 
 logger = logging.getLogger(__name__)
 Clock = Callable[[], datetime]
@@ -35,6 +35,8 @@ class SessionManager:
         self._sessions_by_key: dict[str, Session] = {}
         self._sessions_by_id: dict[str, Session] = {}
         self._restored: dict[str, tuple[str, datetime]] = {}
+        self._message_rules: dict[object | None, list[Session]] = {}
+        self._pending_message_rules: dict[object | None, list[str]] = {}
 
     def _now(self) -> datetime:
         """Return an aware UTC timestamp from the manager clock."""
@@ -84,6 +86,7 @@ class SessionManager:
         self._sessions_by_key[event.key] = session
         self._sessions_by_id[session.id] = session
         self._sessions_by_key[session.id] = session
+        self._index_message_rule(session)
         session.mark_hydrated()
 
         try:
@@ -175,6 +178,7 @@ class SessionManager:
     async def close(self, session: Session) -> None:
         """Close a live session and remove its persisted snapshot."""
         await session.close()
+        self._unindex_message_rule(session)
         self._sessions_by_id.pop(session.id, None)
         for key, candidate in tuple(self._sessions_by_key.items()):
             if candidate is session:
@@ -196,10 +200,15 @@ class SessionManager:
             record for record in await self.store.load_keys() if record.expires_at > now
         )
         self._restored = {}
+        self._pending_message_rules = {}
         for record in records:
             expires_at = record.expires_at
             self._restored[record.id] = (record.id, expires_at)
             self._restored[record.routing_key] = (record.id, expires_at)
+            if record.trigger is TriggerType.MESSAGE:
+                self._pending_message_rules.setdefault(record.channel_id, []).append(
+                    record.id
+                )
         return records
 
     async def _load_restored(self, key: str) -> Session | None:
@@ -247,6 +256,7 @@ class SessionManager:
         self._sessions_by_key[record.routing_key] = session
         self._sessions_by_key[record.id] = session
         self._sessions_by_id[record.id] = session
+        self._index_message_rule(session)
         self._forget_restored(record.id)
         self._forget_restored(record.routing_key)
         return session
@@ -254,6 +264,66 @@ class SessionManager:
     def _forget_restored(self, key: str) -> None:
         """Remove a restored routing key once it is no longer pending."""
         self._restored.pop(key, None)
+
+    def _index_message_rule(self, session: Session) -> None:
+        """Index a live message-triggered session by its channel."""
+        if session.registration.trigger is not TriggerType.MESSAGE:
+            return
+        self._message_rules.setdefault(session.channel_id, []).append(session)
+
+    def _unindex_message_rule(self, session: Session) -> None:
+        """Remove a message rule from its channel bucket."""
+        bucket = self._message_rules.get(session.channel_id)
+        if not bucket:
+            return
+        if session in bucket:
+            bucket.remove(session)
+        if not bucket:
+            self._message_rules.pop(session.channel_id, None)
+
+    def message_rules(self, channel_id: object | None) -> tuple[Session, ...]:
+        """Return global rules plus the rules scoped to ``channel_id``.
+
+        This is the per-message hot path: two dict lookups and a small list, with
+        no scanning of unrelated channels.
+        """
+        global_rules = self._message_rules.get(None, ())
+        channel_rules = (
+            () if channel_id is None else self._message_rules.get(channel_id, ())
+        )
+        return tuple(global_rules) + tuple(channel_rules)
+
+    async def dispatch_message(self, event: InteractionEvent) -> int:
+        """Deliver a message event to the rules for its channel.
+
+        Returns the number of rules that handled the message. Restored rules are
+        materialized on the first message in their channel, then stay in RAM.
+        """
+        await self._materialize_message_rules(event.channel_id)
+
+        handled = 0
+        for rule in self.message_rules(event.channel_id):
+            if rule.closed:
+                continue
+            if rule.is_expired(self._now()):
+                await self.close(rule)
+                continue
+            try:
+                if not rule.hydrated:
+                    await rule.hydrate(event)
+                    rule.mark_hydrated()
+                if await rule.on_message(event):
+                    handled += 1
+                    rule.touch(self._now())
+            except Exception:
+                logger.exception("Message rule failed: session=%s", rule.id)
+        return handled
+
+    async def _materialize_message_rules(self, channel_id: object | None) -> None:
+        """Load restored rules for a channel on its first message."""
+        for key in (None, channel_id):
+            for session_id in self._pending_message_rules.pop(key, ()):
+                await self._load_restored(session_id)
 
     async def sweep(self) -> int:
         """Close expired live sessions and purge expired store records."""
@@ -269,7 +339,19 @@ class SessionManager:
         self._restored = {
             key: entry for key, entry in self._restored.items() if entry[1] > now
         }
+        self._prune_pending_message_rules()
         return len(expired)
+
+    def _prune_pending_message_rules(self) -> None:
+        """Drop pending rule ids that are no longer restorable."""
+        pruned: dict[object | None, list[str]] = {}
+        for channel_id, session_ids in self._pending_message_rules.items():
+            alive = [
+                session_id for session_id in session_ids if session_id in self._restored
+            ]
+            if alive:
+                pruned[channel_id] = alive
+        self._pending_message_rules = pruned
 
     def active(self) -> tuple[Session, ...]:
         """Return a stable snapshot of live sessions for diagnostics."""

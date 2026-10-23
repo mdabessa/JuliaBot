@@ -1,7 +1,7 @@
 """Tests for the transport-independent Session lifecycle."""
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -98,6 +98,19 @@ def test_expiry_uses_aware_utc_timestamps(fake_clock):
     assert session.created_at.tzinfo is not None
     assert session.created_at.utcoffset().total_seconds() == 0
     assert session.is_expired(fake_clock.now()) is False
+
+
+def test_persistent_session_never_expires(fake_clock):
+    session = Session(make_registration(persistent=True), event(), clock=fake_clock.now)
+    never = datetime.max.replace(tzinfo=timezone.utc)
+
+    assert session.expires_at == never
+
+    fake_clock.advance(10**8)
+    assert session.is_expired() is False
+
+    session.touch()
+    assert session.expires_at == never
 
 
 @pytest.mark.asyncio

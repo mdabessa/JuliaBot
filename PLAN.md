@@ -798,6 +798,38 @@ an async task that calls `purge_expired`; the deletion itself happens in SQL.
 
 **Tests:** `tests/unit/sessions/test_message_rules.py`, `test_channel_entry_point.py`.
 
+#### Phase 7 implementation note
+
+Decisions and deviations:
+
+1. **The live message-rule index lives in `SessionManager`, not `Registry`.** `Registry` indexes *code
+   registrations*, which are static; message rules are *per-channel instances* created at runtime.
+   The manager owns their lifecycle, so it keeps `_message_rules: {channel_id: [Session]}` plus a
+   `None` bucket for global rules. Per message this is two dict lookups and a small list — the same
+   efficiency guarantee the plan asked for.
+2. **`Registration.persistent` was added.** A rule that "lives forever" cannot be expressed with a
+   finite timeout, and using a huge number would eventually expire. Persistent sessions get
+   `expires_at = datetime.max` (UTC) and `touch()` never moves it; `purge_expired` can never match.
+3. **`Session.on_message()` is a base hook returning `False`.** The manager must call it without
+   importing `patterns.message_rule` (which would create a manager → patterns → transports → manager
+   cycle). Message rules override it; other sessions ignore it.
+4. **Rules are restored lazily per channel.** Boot only records their ids in
+   `_pending_message_rules`; the first message in a channel loads each pending rule once, then it
+   stays in RAM. Boot cost stays at one `load_keys()` and the per-message budget stays at zero store
+   calls after materialization.
+5. **Bot messages are ignored at the transport level**, so a rule replying with its own message
+   cannot loop indefinitely.
+6. **`ChannelEntryPointRule` is a primitive, not a product feature.** It owns the anchor message, the
+   persistent button view, the owner-only `disable` action, and an `on_channel_message` hook. No
+   command creates it yet — wiring that is a product decision (the original request described this
+   as a future interaction).
+7. **A failing rule is isolated.** Exceptions are logged per rule and do not stop delivery to the
+   other rules in the channel; the handler contract remains "return `True` when handled".
+8. **`CountingStore` in the test fixtures now subclasses `MemoryStore`.** The Phase 1 duck-type
+   stored session objects, which cannot feed `restore()`; delegating keeps the call counts and gives
+   the restore tests real snapshots.
+
+
 **Exit criteria:** every message is evaluated with 2 lookups and 0 store calls; rules survive a
 restart; a rule can be created and removed at runtime; the AI cog can later adopt this path without
 framework changes.

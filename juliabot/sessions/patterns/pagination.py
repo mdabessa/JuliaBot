@@ -109,10 +109,12 @@ class PaginationSession(Session, Generic[Item]):
         if self.progressive:
             self._loading_task = asyncio.create_task(self._consume_progressive())
 
-    async def hydrate(self) -> None:
-        """Reload transient items after a future persisted restore."""
+    async def hydrate(self, event: InteractionEvent | None = None) -> None:
+        """Reload transient items and reattach the original Discord message."""
         self._items = list(await self.load_items())
         self.set_payload("index", self._normalise_index(self.index))
+        if self._message is None and event is not None:
+            self._message = getattr(getattr(event, "raw", None), "message", None)
 
     async def previous_page(self, event: InteractionEvent) -> None:
         """Move to the previous page, loading the previous remote page first."""

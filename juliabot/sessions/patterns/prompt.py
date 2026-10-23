@@ -65,6 +65,11 @@ class PromptSession(Session):
     async def on_choice(self, choice: str, event: InteractionEvent) -> None:
         """Handle the accepted choice; the prompt closes afterwards."""
 
+    async def hydrate(self, event: InteractionEvent | None = None) -> None:
+        """Reattach the original prompt message after a restore."""
+        if self._message is None and event is not None:
+            self._message = getattr(getattr(event, "raw", None), "message", None)
+
     async def start(self, event: InteractionEvent) -> None:
         """Send the prompt message with one persistent button per choice."""
         if not self.choices:

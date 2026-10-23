@@ -7,11 +7,14 @@ without a database lookup for unrelated component interactions. Views use
 
 from __future__ import annotations
 
+from typing import Iterable
+
 from discord import ButtonStyle, Interaction
 from discord.ui import Button, View
 
 from ..manager import SessionManager
 from ..session import Session
+from ..store import StoredSession
 from ..types import Action, InteractionEvent, TriggerType
 
 _CUSTOM_ID_PREFIX = "sess"
@@ -67,6 +70,39 @@ class SessionButtonView(View):
 def build_button_view(manager: SessionManager, session: Session) -> SessionButtonView:
     """Build a persistent button view for a live session."""
     return SessionButtonView(manager, session)
+
+
+def restore_button_views(
+    manager: SessionManager, client: object, records: Iterable[StoredSession]
+) -> int:
+    """Re-register persistent views for restored component sessions.
+
+    Only routing metadata is needed: no payload is loaded and no hydration runs
+    until the first click, so boot cost stays independent of session content.
+    """
+    restored = 0
+    for record in records:
+        if record.trigger is not TriggerType.COMPONENT:
+            continue
+        registration = manager.registry.get(record.kind)
+        if registration is None:
+            continue
+
+        shell = registration.session_class(
+            registration,
+            InteractionEvent(
+                transport=record.trigger,
+                key=record.routing_key,
+                user_id=record.owner_id,
+                guild_id=record.guild_id,
+                channel_id=record.channel_id,
+                message_id=record.message_id,
+            ),
+            session_id=record.id,
+        )
+        client.add_view(build_button_view(manager, shell))
+        restored += 1
+    return restored
 
 
 def build_custom_id(session_id: str, action_name: str) -> str:

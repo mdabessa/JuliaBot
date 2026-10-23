@@ -107,7 +107,8 @@ def make_manager(session_class, name):
 
 
 def make_context(jikan):
-    return FakeContext(SimpleNamespace(color=0xE6DC56), SimpleNamespace(jikan=jikan))
+    bot = SimpleNamespace(color=0xE6DC56, jikan=jikan)
+    return FakeContext(bot, SimpleNamespace(jikan=jikan))
 
 
 def start_event(context, key="command-1", user_id=7):

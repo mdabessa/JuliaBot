@@ -17,7 +17,7 @@ from juliabot.sessions import (
 
 
 class LifecycleSession(Session):
-    async def hydrate(self) -> None:
+    async def hydrate(self, event=None) -> None:
         self.set_payload("hydrated", True)
 
 

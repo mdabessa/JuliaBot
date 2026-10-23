@@ -8,13 +8,20 @@ transport or Discord objects in persisted state.
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Callable, Hashable
+from typing import Callable, Hashable, Mapping
 from uuid import uuid4
 
 from .registration import Registration
 from .types import InteractionEvent, JSONValue
 
 Clock = Callable[[], datetime]
+
+
+def _as_aware_utc(value: datetime) -> datetime:
+    """Return an aware UTC timestamp, assuming UTC for naive values."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 class Session:
@@ -92,12 +99,36 @@ class Session:
         """Set one JSON-safe payload value."""
         self._payload[key] = value
 
-    async def hydrate(self) -> None:
+    async def hydrate(self, event: InteractionEvent | None = None) -> None:
         """Rebuild transient runtime objects after a persisted restore.
 
         The base has no transient objects, so hydration is intentionally a
-        no-op. The manager marks it complete through ``mark_hydrated``.
+        no-op. Patterns that hold messages or items accept the triggering event
+        so they can reattach to the original Discord message. The manager marks
+        hydration complete through ``mark_hydrated``.
         """
+
+    def restore_state(
+        self,
+        payload: Mapping[str, JSONValue],
+        *,
+        created_at: datetime,
+        last_seen_at: datetime,
+        expires_at: datetime,
+        scope_key: Hashable | None = None,
+    ) -> None:
+        """Apply a persisted snapshot to a freshly constructed session shell.
+
+        The session is left un-hydrated so the first interaction can rebuild
+        transient objects with access to the triggering event.
+        """
+        self._payload = dict(payload)
+        self.created_at = _as_aware_utc(created_at)
+        self.last_seen_at = _as_aware_utc(last_seen_at)
+        self.expires_at = _as_aware_utc(expires_at)
+        self.scope_key = scope_key
+        self._closed = False
+        self._hydrated = False
 
     def mark_hydrated(self) -> None:
         """Mark this session as hydrated after restoration."""

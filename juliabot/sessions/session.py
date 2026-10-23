@@ -44,6 +44,7 @@ class Session:
         self._payload: dict[str, JSONValue] = dict(payload or {})
         self._closed = False
         self._hydrated = False
+        self.manager = None
 
     def _scope_key(self, event: InteractionEvent) -> Hashable | None:
         """Select the runtime scope value used for concurrency limits."""

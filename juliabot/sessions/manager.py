@@ -79,6 +79,7 @@ class SessionManager:
             payload=payload,
             clock=self._clock,
         )
+        session.manager = self
         self._sessions_by_key[event.key] = session
         self._sessions_by_id[session.id] = session
         self._sessions_by_key[session.id] = session
@@ -86,7 +87,9 @@ class SessionManager:
 
         try:
             await session.start(event)
-            if registration.resumable:
+            if session.closed:
+                await self.close(session)
+            elif registration.resumable:
                 await self.store.save(session)
         except Exception:
             await self.close(session)

@@ -636,6 +636,30 @@ deferred to the Postgres store phase, where `hydrate()` is actually invoked.
 **Exit criteria:** `duel` runs as a `PromptSession`; `fun.py` and `animes.py` contain no `cache=`
 dicts and no status protocol.
 
+#### Phase 5 implementation note
+
+Measured delta: `juliabot/cogs/fun.py` grew from 94 to 140 lines (+46) while the cache-driven
+`_duel` handler was replaced by a declarative `DuelPrompt`. Interaction branching now lives in
+`on_choice`, and the pattern owns button construction, dispatch, and closing.
+
+Decisions and deviations:
+
+1. **Per-choice permissions use a `can_handle(choice, event)` hook** instead of expanding
+   `Action`. Duel needs asymmetric rules (only the challenged user may accept; either participant
+   may decline) that a single `owner_only` boolean cannot express. Both choices declare
+   `owner_only=False`, and `can_handle` enforces participation.
+2. **A refused choice keeps the prompt open.** `handle_choice` returns before `on_choice` and
+   before `close()`, so an outsider clicking either button cannot end the duel — matching the old
+   silent-ignore behavior.
+3. **Mentions are derived from ids**, so the payload is exactly `{author_id, vs_id}` with no
+   `User`/`Member` objects. The session can therefore render correctly after a future restore.
+4. **The prompt is sent with `channel.send`**, matching the original duel behavior (not `reply`).
+5. **Duel coverage lives in `tests/unit/test_cog_commands.py` and
+   `tests/unit/sessions/test_duel_prompt.py`.** The plan referenced `tests/unit/test_game_cog.py`,
+   but that module covers the separate `game` cog.
+6. **Random outcome and wording are unchanged** (`randint(0, 1)`, including the `:sob:` /
+   `:sunglasses:` branches); tests pin both branches by patching `fun.randint`.
+
 ---
 
 ### Phase 6 — Postgres store & persistence

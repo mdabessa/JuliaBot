@@ -58,6 +58,52 @@ These are facts from the repository and CI, and the plan is built around them.
 
 ---
 
+### 3.1 Versioned schema migrations (added after the initial plan)
+
+New schema is owned by versioned, reversible migration scripts instead of `create_all`. This was
+added after the plan was written, at the owner's request.
+
+```
+juliabot/migrations/
+    runner.py                 # discovery, ordering, upgrade/downgrade, status
+    __main__.py               # CLI: status | upgrade | downgrade
+    versions/
+        0001_create_session.py
+```
+
+Every script exposes:
+
+| Symbol | Meaning |
+|---|---|
+| `VERSION` | positive integer, unique, execution order |
+| `NAME` | human-readable identifier recorded in the database |
+| `upgrade(connection)` | apply the change |
+| `downgrade(connection)` | undo the change exactly |
+
+Rules:
+
+- Each migration runs **inside its own transaction** and records its version in `schema_migration`
+  in that same transaction, so a failure leaves schema and version consistent.
+- Postgres migrations take a `pg_advisory_xact_lock` to serialise concurrent boots and CI runs.
+- Never edit or renumber a migration that has shipped; add a new one.
+- Tables owned by migrations are listed in `models.MIGRATION_MANAGED_TABLES` and excluded from
+  `Base.metadata.create_all` and from the legacy column auto-sync.
+- `init_db()` creates legacy tables, then applies pending migrations (idempotent, safe on every boot).
+
+CLI, usable locally and from CI:
+
+```
+python -m juliabot.migrations status [--json]
+python -m juliabot.migrations upgrade [--to N] [--dry-run]
+python -m juliabot.migrations downgrade --to N
+```
+
+`--database-url` overrides `DATABASE_URL`. `status --json` and `upgrade --dry-run` exist so a future
+pipeline can detect the current version and decide whether to run pending scripts without mutating
+the database. Exit codes: `0` success, `1` migration error, `2` configuration error.
+
+---
+
 ## 4. Target architecture
 
 ### 4.1 Layers
@@ -694,6 +740,40 @@ Decisions and deviations:
 **Exit criteria:** killing the process and restarting resumes a live pagination session on first
 click; a restart costs one key-only query and zero hydration calls; expired rows are deleted in SQL;
 MemoryStore remains the default when no persistent URL is configured.
+
+#### Phase 6 implementation note
+
+Decisions and deviations:
+
+1. **The `session` table is created by migration `0001`, not `create_all`.** `init_db()` still
+   creates the legacy tables and keeps the conservative `ADD COLUMN` sync, but skips
+   `MIGRATION_MANAGED_TABLES` and then runs pending migrations. New schema therefore has a single,
+   reversible source of truth while existing deployments keep booting unchanged.
+2. **`payload` is stored as `TEXT` containing JSON**, not a native `JSON` column, so SQLite (tests)
+   and Postgres (production) behave identically. The store serialises with `json.dumps`.
+3. **`Session.hydrate()` now receives the triggering event** (`hydrate(event=None)`). A restored
+   session has no Discord message object, so patterns reattach `event.raw.message` on the first
+   click. All overrides were updated.
+4. **Runtime dependencies are rebound during hydration.** Restored anime sessions recover the
+   shared Jikan client from `interaction.client.jikan`; `AnimesCog` now exposes its client on the
+   bot for that purpose. Reminder sessions recover the bot from `interaction.client`.
+5. **View restoration lives in the transport layer** (`restore_button_views`), keeping
+   `SessionManager` free of Discord imports. The manager only indexes routing keys.
+6. **Restore is lazy and metered:** one `load_keys()` at boot (no payloads), one `load()` on the
+   first interaction with a restored session, and zero store reads for every other event. Restored
+   keys live in a small RAM map and are dropped when used, closed, or expired.
+7. **All four migrated sessions are `resumable=True`.** Non-resumable registrations stay RAM-only.
+8. **`PostgresStore` is dialect-portable** and is exercised on SQLite in tests; migration `0001`
+   picks `TIMESTAMP WITH TIME ZONE` on Postgres and `DATETIME` on SQLite.
+9. **The bot always uses the SQL store.** `MemoryStore` remains the default for `SessionManager`
+   instances created without an explicit store (including test-only cog harnesses), so the plan's
+   "MemoryStore when no URL is configured" no longer applies — configuration always provides one.
+10. **No separate `@pytest.mark.integration` Postgres suite.** The migration DDL is dialect-aware
+    and the store uses `Session.merge`, so both engines follow the same code path; round-trip tests
+    on SQLite cover the behaviour without a duplicated, environment-dependent suite.
+
+Not covered by this phase: multi-process coordination (still a single instance). The sweeper remains
+an async task that calls `purge_expired`; the deletion itself happens in SQL.
 
 ---
 

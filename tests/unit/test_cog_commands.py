@@ -44,6 +44,8 @@ COG_MODULES = [
     utilities_module,
 ]
 
+_UNSET = object()
+
 
 @dataclass(frozen=True)
 class CommandCase:
@@ -82,10 +84,12 @@ class FakeSentMessage:
         self.deleted = False
         self.reactions: list[str] = []
 
-    async def edit(self, content=None, embed=None):
+    async def edit(self, content=None, embed=None, view=_UNSET):
         if content is not None:
             self.content = content
         self.embed = embed
+        if view is not _UNSET:
+            self.view = view
         self.edits.append({"content": content, "embed": embed})
 
     async def delete(self):
@@ -379,6 +383,37 @@ async def _run_ai_history(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> N
     assert (
         "Histórico de mensagens" in ctx.channel.sent_messages[-1].content
     ), "ai::ai_history should render the collected AI history"
+
+
+async def _run_ai_ai_channel(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
+    bot, ctx = _make_ctx(content="!ai_channel")
+    cog = ai_module.AICog(bot)
+
+    await ai_module.AICog.ai_channel.callback(cog, ctx, channel=None)
+
+    rules = bot.sessions.message_rules(ctx.channel.id)
+    assert len(rules) == 1, "ai::ai_channel should start a single channel rule"
+    assert rules[0].registration.name == ai_module.AI_CHANNEL
+    assert ctx.channel.sent_messages[0].view is not None
+    assert ctx.channel.sent_messages[-1].content == (
+        f"IA ativada em {ctx.channel.mention}."
+    )
+
+
+async def _run_ai_ai_channel_disable(
+    monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
+) -> None:
+    bot, ctx = _make_ctx(content="!ai_channel_disable")
+    cog = ai_module.AICog(bot)
+    await ai_module.AICog.ai_channel.callback(cog, ctx, channel=None)
+
+    await ai_module.AICog.ai_channel_disable.callback(cog, ctx, channel=None)
+
+    assert bot.sessions.message_rules(ctx.channel.id) == ()
+    anchor = ctx.channel.sent_messages[0]
+    assert anchor.content == ai_module.AIConversationRule.disabled_text
+    assert anchor.view is None
+    assert ctx.channel.sent_messages[-1].content == "IA desativada neste canal."
 
 
 async def _run_animes_search_anime(
@@ -894,6 +929,44 @@ async def _run_server_config_set_timezone(
     ), "server_config::set_timezone should persist the selected timezone"
 
 
+async def _run_server_config_entrypoint(
+    monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
+) -> None:
+    bot, ctx = _make_ctx(content="!entrypoint")
+    cog = server_config_module.ServerConfigCog(bot)
+
+    await server_config_module.ServerConfigCog.entrypoint.callback(
+        cog, ctx, channel=None
+    )
+
+    rules = bot.sessions.message_rules(ctx.channel.id)
+    assert len(rules) == 1, "server_config::entrypoint should start a channel rule"
+    assert rules[0].registration.name == server_config_module.ENTRY_POINT
+    assert ctx.channel.sent_messages[0].view is not None
+    assert ctx.channel.sent_messages[-1].content == (
+        f"Interação permanente criada em {ctx.channel.mention}."
+    )
+
+
+async def _run_server_config_entrypoint_disable(
+    monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
+) -> None:
+    bot, ctx = _make_ctx(content="!entrypoint_disable")
+    cog = server_config_module.ServerConfigCog(bot)
+    await server_config_module.ServerConfigCog.entrypoint.callback(
+        cog, ctx, channel=None
+    )
+
+    await server_config_module.ServerConfigCog.entrypoint_disable.callback(
+        cog, ctx, channel=None
+    )
+
+    assert bot.sessions.message_rules(ctx.channel.id) == ()
+    anchor = ctx.channel.sent_messages[0]
+    assert anchor.content == server_config_module.ChannelEntryPointRule.disabled_text
+    assert anchor.view is None
+
+
 async def _run_twitch_stream(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
     bot, ctx = _make_ctx(content="!stream streamer")
     cog = twitch_module.TwitchCog(bot)
@@ -1033,6 +1106,8 @@ COMMAND_CASES = [
     CommandCase("ai", "ask", _run_ai_ask),
     CommandCase("ai", "breakpoint", _run_ai_breakpoint),
     CommandCase("ai", "ai_history", _run_ai_history),
+    CommandCase("ai", "ai_channel", _run_ai_ai_channel),
+    CommandCase("ai", "ai_channel_disable", _run_ai_ai_channel_disable),
     CommandCase("animes", "search_anime", _run_animes_search_anime),
     CommandCase("animes", "anime_list", _run_animes_anime_list),
     CommandCase("animes", "add_anime", _run_animes_add_anime),
@@ -1062,6 +1137,10 @@ COMMAND_CASES = [
     CommandCase("reminder", "remind_me_loop", _run_reminder_remind_me_loop),
     CommandCase("server_config", "set_prefix", _run_server_config_set_prefix),
     CommandCase("server_config", "set_timezone", _run_server_config_set_timezone),
+    CommandCase("server_config", "entrypoint", _run_server_config_entrypoint),
+    CommandCase(
+        "server_config", "entrypoint_disable", _run_server_config_entrypoint_disable
+    ),
     CommandCase("twitch", "stream", _run_twitch_stream),
     CommandCase("twitch", "add_streamer", _run_twitch_add_streamer),
     CommandCase("twitch", "remove_streamer", _run_twitch_remove_streamer),

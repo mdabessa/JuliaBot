@@ -26,6 +26,7 @@ from juliabot.cogs import reminder as reminder_module
 from juliabot.cogs import server_config as server_config_module
 from juliabot.cogs import twitch as twitch_module
 from juliabot.cogs import utilities as utilities_module
+from juliabot.sessions import Scope
 
 COG_MODULES = [
     ai_module,
@@ -704,26 +705,25 @@ async def _run_fun_duel(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> Non
     challenged = FakeUser(808, display_name="rival")
     bot, ctx = _make_ctx(content="!duel", mentions=[challenged])
     cog = fun_module.FunCog(bot)
-    script_calls = []
-
-    class FakeScript:
-        def __init__(self, name, function_name):
-            script_calls.append((name, function_name))
-
-        async def execute(self, **kwargs):
-            script_calls.append(kwargs)
-
-    monkeypatch.setattr(fun_module, "Script", FakeScript)
 
     await fun_module.FunCog.duel.callback(cog, ctx, user=challenged)
 
-    assert script_calls[0] == (
-        f"duel_{ctx.guild.id}",
-        "duel",
-    ), "fun::duel should start the duel script with a guild-scoped key"
-    assert (
-        script_calls[1]["message"] is ctx.message
-    ), "fun::duel should pass the challenge message to the duel session"
+    sessions = bot.sessions.active()
+
+    assert len(sessions) == 1
+    session = sessions[0]
+    assert session.registration.name == fun_module.DUEL
+    assert session.registration.scope is Scope.GUILD
+    assert session.registration.max_per_scope == 2
+    assert session.registration.timeout == 60
+    assert session.to_payload() == {
+        "author_id": ctx.author.id,
+        "vs_id": challenged.id,
+    }
+    assert ctx.channel.sent_messages[-1].content == (
+        f"{ctx.author.mention} desafia {challenged.mention} para um duelo!"
+    )
+    assert ctx.channel.sent_messages[-1].view is not None
 
 
 async def _run_fun_dice(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:

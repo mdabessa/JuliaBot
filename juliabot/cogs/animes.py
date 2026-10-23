@@ -38,6 +38,20 @@ ANIME_SEARCH = "animes.search"
 ANIME_LIST = "animes.list"
 
 
+def _bind_runtime(session, context) -> None:
+    """Bind the shared Jikan client and embed color from a context.
+
+    Commands expose the bot as ``context.bot``; component interactions expose it
+    as ``context.client``. Both paths end up on the bot, which owns the shared
+    Jikan client.
+    """
+    bot = getattr(context, "bot", None) or getattr(context, "client", None)
+    if bot is None:
+        return
+    session._jikan = bot.jikan
+    session._color = bot.color
+
+
 @dataclass(frozen=True)
 class AnimeEntry:
     """Runtime pair of a Jikan anime and the user's watchlist row."""
@@ -81,9 +95,14 @@ class AnimeSearchPagination(PaginationSession["Anime"]):
         context = event.raw
         if context is None or getattr(context, "cog", None) is None:
             raise RuntimeError("Anime sessions require an invoking cog context")
-        self._jikan = context.cog.jikan
-        self._color = context.bot.color
+        _bind_runtime(self, context)
         await super().start(event)
+
+    async def hydrate(self, event: InteractionEvent | None = None) -> None:
+        """Rebind the shared Jikan client before reloading the page."""
+        if event is not None:
+            _bind_runtime(self, event.raw)
+        await super().hydrate(event)
 
     async def load_items(self) -> list["Anime"]:
         """Fetch one Jikan page and keep its pagination metadata."""
@@ -178,10 +197,15 @@ class AnimeListPagination(PaginationSession[AnimeEntry]):
         context = event.raw
         if context is None or getattr(context, "cog", None) is None:
             raise RuntimeError("Anime sessions require an invoking cog context")
-        self._jikan = context.cog.jikan
-        self._color = context.bot.color
+        _bind_runtime(self, context)
         self._searching = True
         await super().start(event)
+
+    async def hydrate(self, event: InteractionEvent | None = None) -> None:
+        """Rebind the Jikan client before reloading the watchlist."""
+        if event is not None:
+            _bind_runtime(self, event.raw)
+        await super().hydrate(event)
 
     async def load_rows(self) -> list[AnimesList]:
         """Load the watchlist rows backing this session."""
@@ -246,6 +270,8 @@ class AnimesCog(commands.Cog, name="animes"):
     def __init__(self, bot: Client) -> None:
         self.bot = bot
         self.jikan = AioJikan(rate_limit=BOT_JIKAN_RATE_LIMIT)
+        # Shared with restored sessions, which only have the interaction client.
+        bot.jikan = self.jikan
         if not hasattr(bot, "sessions"):
             bot.sessions = SessionManager(Registry())
         self._register_sessions()
@@ -260,6 +286,7 @@ class AnimesCog(commands.Cog, name="animes"):
                 scope=Scope.USER,
                 timeout=300,
                 max_per_scope=1,
+                resumable=True,
             ),
             Registration(
                 name=ANIME_LIST,
@@ -268,6 +295,7 @@ class AnimesCog(commands.Cog, name="animes"):
                 scope=Scope.USER,
                 timeout=300,
                 max_per_scope=1,
+                resumable=True,
             ),
         )
         for registration in registrations:

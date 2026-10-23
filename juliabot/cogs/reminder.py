@@ -49,6 +49,12 @@ class ReminderPagination(PaginationSession[Reminder]):
         self._bot = getattr(event.raw, "bot", None)
         await super().start(event)
 
+    async def hydrate(self, event: InteractionEvent | None = None) -> None:
+        """Recover the bot reference from the interaction before rendering."""
+        if event is not None and self._bot is None:
+            self._bot = getattr(event.raw, "client", None)
+        await super().hydrate(event)
+
     async def load_items(self):
         """Load the owner's current reminders from the existing model API."""
         return Reminder.get_all(user_id=self.owner_id)
@@ -91,6 +97,7 @@ class _ReminderCog(commands.Cog, name="reminder"):
                     scope=Scope.USER,
                     timeout=180,
                     max_per_scope=1,
+                    resumable=True,
                 )
             )
 

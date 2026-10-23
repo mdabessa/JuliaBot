@@ -107,6 +107,7 @@ class FunCog(commands.Cog, name="fun"):
                     scope=Scope.GUILD,
                     timeout=60,
                     max_per_scope=2,
+                    resumable=True,
                 )
             )
 

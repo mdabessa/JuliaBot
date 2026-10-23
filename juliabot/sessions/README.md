@@ -92,6 +92,17 @@ class WelcomeRule(ChannelEntryPointRule):
 
 `ChannelEntryPointRule` sends an anchor message with a persistent view and exposes an owner-only
 `disable` action. Its `anchor_message_id` is persisted so the rule survives restarts.
+`shutdown(channel)` closes the rule through the manager, so the channel index and the stored
+snapshot are dropped as well; the optional channel lets a restored rule re-fetch its anchor before
+removing the controls.
+
+### Shipped rules
+
+- `channel.entry_point` (`cogs/server_config.py`) — a bare durable entry point per channel, managed
+  with `!entrypoint` and `!entrypoint_disable`.
+- `ai.channel` (`cogs/ai.py`) — answers raw messages in an enabled channel with the same history
+  window and breakpoints as `!ask`, skipping command-prefixed messages. Managed with
+  `!ai_channel` and `!ai_channel_disable`.
 
 ## Efficiency contract
 

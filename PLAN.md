@@ -515,6 +515,41 @@ store calls; `core.py` no longer scans or copies anything.
 `hydrate` exist and are exercised by tests even though `MemoryStore` ignores hydration; the
 registration is noticeably shorter than the original handler (record the line-count delta).
 
+#### Phase 3 implementation note
+
+The migration was measured against the Phase 2 baseline: `juliabot/cogs/reminder.py` changed from
+149 to 157 lines overall (+8), while the old cache-driven `_list_reminders` handler was removed and
+replaced by the reusable `PaginationSession` pattern. The new registration block is 10 lines and
+the command start path is 13 lines; the call site is not shorter yet because the framework does
+not have a registration decorator. The complexity reduction is instead in the interaction logic:
+the old handler's status/cache branches are gone, and pagination behavior is shared and tested in
+`juliabot/sessions/patterns/pagination.py`. A later registration ergonomics pass may compress the
+10-line declaration once more session patterns exist.
+
+Minimum session-definition recipe after Phase 3:
+
+```python
+class MyPagination(PaginationSession[Item]):
+   extra_actions = (Action("delete", "delete_current"),)
+
+   async def load_items(self):
+      return await repository.list_items(self.owner_id)
+
+   async def render_item(self, item, index, total):
+      return await render_item_embed(item, index, total)
+
+   async def delete_item(self, item, event):
+      await repository.delete(item)
+
+registry.register(Registration(
+   name="feature.items",
+   session_class=MyPagination,
+   trigger=TriggerType.COMPONENT,
+   scope=Scope.USER,
+   timeout=180,
+))
+```
+
 ---
 
 ### Phase 4 — Migrate the animes sessions

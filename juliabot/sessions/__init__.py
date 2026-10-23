@@ -4,7 +4,7 @@ from .manager import SessionManager
 from .registration import Registration
 from .registry import Registry
 from .session import Session
-from .store import MemoryStore, SessionStore, StoredSession
+from .store import MemoryStore, PostgresStore, SessionStore, StoredSession
 from .types import Action, InteractionEvent, JSONValue, Scope, TriggerType
 
 __all__ = [
@@ -12,6 +12,7 @@ __all__ = [
     "InteractionEvent",
     "JSONValue",
     "MemoryStore",
+    "PostgresStore",
     "Registration",
     "Registry",
     "Scope",

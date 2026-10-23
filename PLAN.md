@@ -858,6 +858,20 @@ framework changes.
 **Exit criteria:** `juliabot/scripts.py` is gone; the framework is the only interaction mechanism;
 docs describe how to add a new dialogue.
 
+#### Phase 8 implementation note
+
+- The reaction transport was removed. All four production sessions are button-based, `CoreCog` no
+  longer registers `on_reaction_add`, and `Client` no longer exposes `session_reactions`.
+- Deleted: `juliabot/scripts.py`, `tests/unit/test_scripts_engine.py`,
+  `juliabot/sessions/transports/reactions.py`, `tests/unit/sessions/test_transports_reactions.py`.
+- The debug command was renamed from `scripts` to `sessions` and now reads only `bot.sessions`; the
+  legacy aliases `scripts` and `get_scripts` are kept for compatibility.
+- `CoreCog.scripts_time_out` is gone; `sessions_time_out` calls `manager.sweep()`.
+- `tests/unit/test_no_legacy_engine.py` guards that the module is gone and that no file under
+  `juliabot/` references `juliabot.scripts` or `from ..scripts`.
+- Docs added: `juliabot/sessions/README.md` (layers, registration recipe, ownership, persistence,
+  efficiency contract, migrations) and an updated project `README.md`.
+
 ---
 
 ## 8. Test plan
@@ -949,9 +963,33 @@ Required non-obvious tests:
    write-behind (debounced flush, near-zero writes, small loss window). Recommend write-through and
    revisit only if write volume becomes a problem.
 3. **Final merge method** for epic → `main`: squash vs merge commit (see §6.3).
-4. **Reaction transport retirement timing** — Phase 8 assumes full button migration. If any reaction
-   UX is still wanted, keep `transports/reactions.py` and adjust this plan.
+4. **Reaction transport retirement** — resolved in Phase 8: every session is button-based and the
+   transport was deleted. Reintroducing reactions would need a new transport plus the message-keyed
+   index; the framework still models `TriggerType.REACTION`.
 5. **AI cog adoption** of `MessageRuleSession` for raw-message conversations (explicitly out of scope
    here; the framework will be ready).
 6. **`resumable` defaults per session** — currently opt-in per registration; revisit if most
    sessions end up resumable.
+
+---
+
+## 13. Execution status
+
+| Phase | Branch | Result |
+|---|---|---|
+| 0 | `refactor/session-framework-phase-0-safety-net` | Baseline characterization tests, pytest config, CI trigger |
+| 1 | `refactor/session-framework-phase-1-core-primitives` | Types, registration, registry, session, manager, `MemoryStore` |
+| 2 | `refactor/session-framework-phase-2-transports-dispatcher` | Button transport, client/core wiring, debug inspection |
+| 3 | `refactor/session-framework-phase-3-pagination-reminder` | `PaginationSession` + reminder migration |
+| 4 | `refactor/session-framework-phase-4-animes` | Remote/progressive pagination + animes migration |
+| 5 | `refactor/session-framework-phase-5-prompt-duel` | `PromptSession` + duel migration |
+| 6 | `refactor/session-framework-phase-6-postgres-store` | Versioned migrations, SQL store, restart restore |
+| 7 | `refactor/session-framework-phase-7-message-rules` | Message rules + durable channel entry point |
+| 8 | `refactor/session-framework-phase-8-legacy-removal` | Legacy engine and reaction transport deleted, docs |
+
+All phases are complete on their branches and merged into the epic branch
+`refactor/session-framework`. The epic → `main` merge is still pending (see §6.3).
+
+Remaining product work tracked outside this plan: wiring a command that creates
+`ChannelEntryPointRule`, and adopting `MessageRuleSession` in the AI cog for raw-message
+conversations.

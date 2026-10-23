@@ -28,6 +28,7 @@ class Registration:
     timeout: float = 60.0
     max_per_scope: int | None = 1
     resumable: bool = False
+    persistent: bool = False
 
     def __post_init__(self) -> None:
         """Reject invalid registration limits early."""

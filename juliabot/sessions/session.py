@@ -46,7 +46,7 @@ class Session:
         self.scope_key: Hashable | None = self._scope_key(event)
         self.created_at = self._now(clock)
         self.last_seen_at = self.created_at
-        self.expires_at = self.created_at + timedelta(seconds=registration.timeout)
+        self.expires_at = self._initial_expiry(registration, self.created_at)
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._payload: dict[str, JSONValue] = dict(payload or {})
         self._closed = False
@@ -71,6 +71,13 @@ class Session:
         if value.tzinfo is None:
             raise ValueError("Session clocks must return timezone-aware datetimes")
         return value.astimezone(timezone.utc)
+
+    @staticmethod
+    def _initial_expiry(registration: Registration, created_at: datetime) -> datetime:
+        """Return the idle deadline, or the far future for persistent sessions."""
+        if registration.persistent:
+            return datetime.max.replace(tzinfo=timezone.utc)
+        return created_at + timedelta(seconds=registration.timeout)
 
     @property
     def actions(self):
@@ -137,6 +144,14 @@ class Session:
     async def start(self, event: InteractionEvent) -> None:
         """Perform first-render behavior for a newly created session."""
 
+    async def on_message(self, event: InteractionEvent) -> bool:
+        """Handle a message event; message rules override this hook.
+
+        Return ``True`` when the message was handled, which lets the manager
+        count deliveries and refresh sliding expiry.
+        """
+        return False
+
     async def render(self) -> None:
         """Render the current state; concrete patterns provide the UI."""
 
@@ -155,7 +170,8 @@ class Session:
             raise ValueError("Session timestamps must be timezone-aware")
         current = current.astimezone(timezone.utc)
         self.last_seen_at = current
-        self.expires_at = current + timedelta(seconds=self.registration.timeout)
+        if not self.registration.persistent:
+            self.expires_at = current + timedelta(seconds=self.registration.timeout)
 
     def is_expired(self, now: datetime | None = None) -> bool:
         """Return whether the session's idle deadline has passed."""

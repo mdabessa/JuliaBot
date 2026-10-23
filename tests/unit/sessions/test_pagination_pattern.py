@@ -52,6 +52,7 @@ class NumberPagination(PaginationSession[int]):
 
     async def delete_item(self, item, event):
         self.deleted.append(item)
+        return True
 
 
 def registration():

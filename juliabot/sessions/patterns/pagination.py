@@ -7,7 +7,8 @@ sessions provide item loading, rendering, and mutation hooks.
 
 from __future__ import annotations
 
-from typing import Generic, Sequence, TypeVar
+import asyncio
+from typing import AsyncIterator, Generic, Sequence, TypeVar
 
 from ..session import Session
 from ..transports.buttons import build_button_view
@@ -21,11 +22,14 @@ class PaginationSession(Session, Generic[Item]):
 
     extra_actions: tuple[Action, ...] = ()
     empty_message = "Não há itens para exibir."
+    loading_message = "Carregando..."
+    progressive = False
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._items: list[Item] = []
         self._message = None
+        self._loading_task: asyncio.Task | None = None
 
     @property
     def actions(self) -> tuple[Action, ...]:
@@ -55,28 +59,55 @@ class PaginationSession(Session, Generic[Item]):
         """Build the Discord content for one page."""
         raise NotImplementedError
 
-    async def delete_item(self, item: Item, event: InteractionEvent) -> None:
-        """Delete an item from its backing store; optional for read-only pages."""
+    async def delete_item(self, item: Item, event: InteractionEvent) -> bool:
+        """Delete an item from its backing store, optionally refusing.
+
+        Return ``True`` when the item was removed so the pattern can drop it
+        from the current page. Return ``False`` to keep it, for example when
+        the acting user does not own the entry.
+        """
         raise NotImplementedError
 
+    async def iter_items(self) -> AsyncIterator[Item]:
+        """Yield items to load; override to load progressively."""
+        for item in await self.load_items():
+            yield item
+
+    async def load_more(self, direction: int) -> bool:
+        """Load an adjacent remote page when navigation hits a boundary.
+
+        Return ``True`` when the page was replaced; the pattern then stops
+        handling that navigation. The default keeps local wrap-around.
+        """
+        return False
+
+    async def on_loading_finished(self) -> None:
+        """Hook called after progressive loading fills the page."""
+
     async def start(self, event: InteractionEvent) -> None:
-        """Load items and send the first page with a persistent button view."""
-        self._items = list(await self.load_items())
-        if not self._items:
-            await self.close()
-            return
+        """Send the first page and start progressive loading when configured."""
+        if not self.progressive:
+            self._items = list(await self.load_items())
+            if not self._items:
+                await self.close()
+                return
 
         self.set_payload("index", self._normalise_index(self.index))
         context = event.raw
         if context is None or self.manager is None:
             raise RuntimeError("PaginationSession requires a manager and event context")
-        embed = await self.render_item(
-            self._items[self.index], self.index, len(self._items)
-        )
-        self._message = await context.reply(
-            embed=embed,
-            view=build_button_view(self.manager, self),
-        )
+
+        view = build_button_view(self.manager, self)
+        if self._items:
+            embed = await self.render_item(
+                self._items[self.index], self.index, len(self._items)
+            )
+            self._message = await context.reply(embed=embed, view=view)
+        else:
+            self._message = await context.reply(content=self.loading_message, view=view)
+
+        if self.progressive:
+            self._loading_task = asyncio.create_task(self._consume_progressive())
 
     async def hydrate(self) -> None:
         """Reload transient items after a future persisted restore."""
@@ -84,17 +115,21 @@ class PaginationSession(Session, Generic[Item]):
         self.set_payload("index", self._normalise_index(self.index))
 
     async def previous_page(self, event: InteractionEvent) -> None:
-        """Move to the previous page and render it."""
+        """Move to the previous page, loading the previous remote page first."""
         if not self._items:
             await self.close()
+            return
+        if self.index == 0 and await self.load_more(-1):
             return
         self.set_payload("index", self._normalise_index(self.index - 1))
         await self.render()
 
     async def next_page(self, event: InteractionEvent) -> None:
-        """Move to the next page and render it."""
+        """Move to the next page, loading the next remote page first."""
         if not self._items:
             await self.close()
+            return
+        if self.index + 1 >= len(self._items) and await self.load_more(1):
             return
         self.set_payload("index", self._normalise_index(self.index + 1))
         await self.render()
@@ -105,7 +140,8 @@ class PaginationSession(Session, Generic[Item]):
             await self.close()
             return
         item = self._items[self.index]
-        await self.delete_item(item, event)
+        if not await self.delete_item(item, event):
+            return
         self._items.pop(self.index)
         if not self._items:
             if self._message is not None:
@@ -122,7 +158,40 @@ class PaginationSession(Session, Generic[Item]):
         embed = await self.render_item(
             self._items[self.index], self.index, len(self._items)
         )
-        await self._message.edit(embed=embed)
+        await self._message.edit(content=None, embed=embed)
+
+    async def wait_for_loading(self) -> None:
+        """Wait for progressive loading to finish, if it is running."""
+        task = self._loading_task
+        if task is not None and not task.done():
+            await asyncio.shield(task)
+
+    async def _consume_progressive(self) -> None:
+        """Append progressively loaded items and finalize the page."""
+        try:
+            async for item in self.iter_items():
+                if self.closed:
+                    return
+                await self.append_item(item)
+            if not self._items:
+                await self._show_empty()
+                await self.close()
+                return
+            await self.on_loading_finished()
+        finally:
+            self._loading_task = None
+
+    async def _show_empty(self) -> None:
+        """Replace the loading placeholder with the empty-state message."""
+        if self._message is not None:
+            await self._message.edit(content=self.empty_message, embed=None)
+
+    async def close(self) -> None:
+        """Close the session and stop any progressive loader."""
+        task = self._loading_task
+        if task is not None and task is not asyncio.current_task() and not task.done():
+            task.cancel()
+        await super().close()
 
     async def refresh_items(self) -> None:
         """Reload items and render the current page when possible."""

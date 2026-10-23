@@ -59,13 +59,14 @@ class ReminderPagination(PaginationSession[Reminder]):
         embed.set_footer(text=f"{index + 1}/{total} Lembrete(s)")
         return embed
 
-    async def delete_item(self, item: Reminder, event: InteractionEvent) -> None:
+    async def delete_item(self, item: Reminder, event: InteractionEvent) -> bool:
         """Delete the selected reminder and announce the deletion."""
         item.delete()
         if self._message is not None:
             await self._message.channel.send(
                 f"Lembrete de `{item.get_date_str()}` deletado com sucesso!"
             )
+        return True
 
 
 class _ReminderCog(commands.Cog, name="reminder"):

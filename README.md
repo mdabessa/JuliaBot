@@ -7,6 +7,7 @@ JuliaBot is a Discord bot written in Python using the [discord.py](https://githu
 - Subscribing to anime series to receive notifications
 - Reminder system for setting reminders
 - Translation command
+- Interactive session framework: button pagination, prompts, and per-channel message rules
 
 ## Installation
 1. Clone the repository
@@ -27,22 +28,33 @@ The help command can be used to get a list of all commands and can be passed a c
 ## Testing
 To run the tests, use the command `pytest` in the root directory of the repository.
 
+## Interactive sessions
+Multi-step interactions (pagination, confirmations, durable channel rules) are built on
+`juliabot/sessions/`. Adding a new dialogue means declaring a session class, a `Registration`, and a
+JSON-safe payload; buttons, ownership, expiry, and restart restoration are handled by the framework.
+See [juliabot/sessions/README.md](juliabot/sessions/README.md).
+
 ## Database schema updates
-On startup, the bot automatically creates missing tables and applies simple schema updates for existing tables by adding missing columns.
-The startup logs include a summary showing exactly which columns were added automatically.
+The schema is managed by versioned, reversible migrations in `juliabot/migrations/versions/`. Each
+script defines `upgrade()` and `downgrade()`, and applied versions are tracked in the
+`schema_migration` table.
 
-What is automatic:
-- New tables
-- New columns without relations
-- New non-null columns only when a `server_default` is defined
+On startup, `init_db()` creates the legacy tables and applies any pending migrations, so a normal
+deploy needs no extra step. For controlled deploys and CI:
 
-What is not automatic:
-- Renames
-- Type changes
-- Removing columns
-- Foreign keys and other complex constraints
+```bash
+python -m juliabot.migrations status --json
+python -m juliabot.migrations upgrade --dry-run
+python -m juliabot.migrations upgrade
+python -m juliabot.migrations downgrade --to 0
+```
 
-For unsupported changes, use a dedicated migration tool (for example, Alembic).
+`--database-url` overrides `DATABASE_URL`. Exit codes: `0` success, `1` migration error,
+`2` configuration error.
+
+Legacy tables still receive conservative `ADD COLUMN` updates for simple columns. Tables listed in
+`models.MIGRATION_MANAGED_TABLES` (currently `session`) are owned exclusively by migrations and are
+excluded from `create_all` and from the automatic column sync.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details

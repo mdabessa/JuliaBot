@@ -71,11 +71,12 @@ class AsyncHistory:
 
 
 class FakeSentMessage:
-    def __init__(self, content=None, embed=None, file=None, channel=None):
+    def __init__(self, content=None, embed=None, file=None, channel=None, view=None):
         self.content = content
         self.embed = embed
         self.file = file
         self.channel = channel
+        self.view = view
         self.edits: list[dict[str, object]] = []
         self.deleted = False
         self.reactions: list[str] = []
@@ -83,8 +84,7 @@ class FakeSentMessage:
     async def edit(self, content=None, embed=None):
         if content is not None:
             self.content = content
-        if embed is not None:
-            self.embed = embed
+        self.embed = embed
         self.edits.append({"content": content, "embed": embed})
 
     async def delete(self):
@@ -134,8 +134,14 @@ class FakeChannel:
         self.sent_messages: list[FakeSentMessage] = []
         self.history_messages: list[object] = []
 
-    async def send(self, content=None, embed=None, file=None):
-        message = FakeSentMessage(content=content, embed=embed, file=file, channel=self)
+    async def send(self, content=None, embed=None, file=None, view=None):
+        message = FakeSentMessage(
+            content=content,
+            embed=embed,
+            file=file,
+            channel=self,
+            view=view,
+        )
         self.sent_messages.append(message)
         return message
 
@@ -233,11 +239,15 @@ class FakeContext:
             mentions=mentions,
         )
 
-    async def send(self, content=None, embed=None, file=None):
-        return await self.channel.send(content=content, embed=embed, file=file)
+    async def send(self, content=None, embed=None, file=None, view=None):
+        return await self.channel.send(
+            content=content, embed=embed, file=file, view=view
+        )
 
-    async def reply(self, content=None, embed=None, file=None):
-        message = await self.channel.send(content=content, embed=embed, file=file)
+    async def reply(self, content=None, embed=None, file=None, view=None):
+        message = await self.channel.send(
+            content=content, embed=embed, file=file, view=view
+        )
         self.reply_messages.append(message)
         return message
 
@@ -814,16 +824,11 @@ async def _run_help_help(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> No
 async def _run_reminder_list(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
     bot, ctx = _make_ctx(content="!list_reminders")
     cog = reminder_module._ReminderCog(bot)
-    script_calls = []
 
-    class FakeScript:
-        def __init__(self, name, function_name, time_out):
-            script_calls.append((name, function_name, time_out))
+    async def fake_reminder_embed(reminder, _bot):
+        return Embed(title=f"Reminder {reminder.user_id}")
 
-        async def execute(self, **kwargs):
-            script_calls.append(kwargs)
-
-    monkeypatch.setattr(reminder_module, "Script", FakeScript)
+    monkeypatch.setattr(reminder_module, "reminder_embed", fake_reminder_embed)
     monkeypatch.setattr(
         reminder_module.Reminder,
         "get_all",
@@ -832,27 +837,12 @@ async def _run_reminder_list(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -
 
     await reminder_module._ReminderCog.list_reminders.callback(cog, ctx)
 
-    name, function_name, time_out = script_calls[0]
-
-    assert (
-        name == f"{ctx.author.id}_list_reminders"
-    ), "reminder::list_reminders should scope the session to the command author"
-    assert (
-        function_name == "list_reminders"
-    ), "reminder::list_reminders should spawn the list_reminders session"
-    assert time_out == 180, "reminder::list_reminders should idle out after 180s"
-
-    spawn_kwargs = script_calls[1]
-
-    assert (
-        spawn_kwargs["ctx"] is ctx
-    ), "reminder::list_reminders should pass the command context to the session"
-    assert (
-        spawn_kwargs["bot"] is bot
-    ), "reminder::list_reminders should pass the bot instance to the session"
-    assert spawn_kwargs[
-        "reminders"
-    ], "reminder::list_reminders should pass the user reminders to the session"
+    sessions = bot.sessions.active()
+    assert len(sessions) == 1
+    assert sessions[0].registration.name == reminder_module.LIST_REMINDERS
+    assert sessions[0].registration.timeout == 180
+    assert sessions[0].to_payload() == {"index": 0}
+    assert ctx.reply_messages[0].view is not None
 
 
 async def _run_reminder_remind_me(

@@ -26,7 +26,7 @@ from juliabot.cogs import reminder as reminder_module
 from juliabot.cogs import server_config as server_config_module
 from juliabot.cogs import twitch as twitch_module
 from juliabot.cogs import utilities as utilities_module
-from juliabot.sessions import Scope
+from juliabot.sessions import Registry, Scope, SessionManager
 
 COG_MODULES = [
     ai_module,
@@ -188,6 +188,7 @@ class FakeBot:
         self.processed_messages: list[FakeMessage] = []
         self.channel_map: dict[int, FakeChannel] = {}
         self.owner_result = True
+        self.sessions = SessionManager(Registry())
 
     async def get_prefix(self, _message):
         return "!"
@@ -672,16 +673,15 @@ async def _run_debug_reload(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) ->
     ), "debug::reload should finalize the progress message"
 
 
-async def _run_debug_scripts(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
-    bot, ctx = _make_ctx(content="!scripts")
+async def _run_debug_sessions(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
+    bot, ctx = _make_ctx(content="!sessions")
     cog = debug_module.DebugCog(bot)
-    monkeypatch.setattr(debug_module.Script, "get_scripts", lambda: [])
 
-    await debug_module.DebugCog.get_all_scripts.callback(cog, ctx)
+    await debug_module.DebugCog.get_all_sessions.callback(cog, ctx)
 
     assert (
-        ctx.channel.sent_messages[-1].content == "Nenhum script rodando no momento."
-    ), "debug::scripts should explain when there are no live scripts"
+        ctx.channel.sent_messages[-1].content == "Nenhuma sessão rodando no momento."
+    ), "debug::sessions should explain when there are no live sessions"
 
 
 async def _run_debug_exec(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
@@ -1049,7 +1049,7 @@ COMMAND_CASES = [
     CommandCase("core", "say", _run_core_say),
     CommandCase("core", "upchat", _run_core_upchat),
     CommandCase("debug", "reload", _run_debug_reload),
-    CommandCase("debug", "scripts", _run_debug_scripts),
+    CommandCase("debug", "sessions", _run_debug_sessions),
     CommandCase("debug", "exec", _run_debug_exec),
     CommandCase("fun", "duel", _run_fun_duel),
     CommandCase("fun", "dice", _run_fun_dice),

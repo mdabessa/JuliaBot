@@ -1,19 +1,18 @@
 """Debug utilities cog for bot owners.
 
-Provides commands to reload cogs, inspect running scripts, and execute
+Provides commands to reload cogs, inspect running sessions, and execute
 commands as other users.
 """
 
 from discord.ext import commands
 
 from ..client import Client
-from ..scripts import Script
 
 
 class DebugCog(commands.Cog):
     """Debug and administrative utilities.
 
-    Restricted to bot owner. Provides cog reloading, script inspection,
+    Restricted to bot owner. Provides cog reloading, session inspection,
     and command execution utilities.
     """
 
@@ -40,31 +39,22 @@ class DebugCog(commands.Cog):
         await msg.edit(content="Cogs regarregados com sucesso!")
 
     @commands.command(
-        name="scripts",
-        brief="Listar todos os scripts rodando.",
-        aliases=["get_scripts"],
+        name="sessions",
+        brief="Listar todas as sessões rodando.",
+        aliases=["scripts", "get_scripts"],
     )
-    async def get_all_scripts(self, ctx: commands.Context):
-        sessions = getattr(self.bot, "sessions", None)
-        active_sessions = sessions.active() if sessions is not None else ()
-        if active_sessions:
-            for session in active_sessions:
-                await ctx.send(
-                    f"```Nome: {session.registration.name}\n"
-                    f"ID: {session.id}\n"
-                    f"Payload: {session.to_payload()}```"
-                )
+    async def get_all_sessions(self, ctx: commands.Context):
+        sessions = self.bot.sessions.active()
+        if not sessions:
+            await ctx.send("Nenhuma sessão rodando no momento.")
             return
 
-        # Existing cogs still use Script until their migration phases. Keep the
-        # diagnostic command useful during that transition.
-        scripts = Script.get_scripts()
-        if not scripts:
-            await ctx.send("Nenhum script rodando no momento.")
-            return
-
-        for script in scripts:
-            await ctx.send(f"```Nome: {script.name}\nCache:{script.cache}```")
+        for session in sessions:
+            await ctx.send(
+                f"```Nome: {session.registration.name}\n"
+                f"ID: {session.id}\n"
+                f"Payload: {session.to_payload()}```"
+            )
 
     @commands.command(
         name="exec",

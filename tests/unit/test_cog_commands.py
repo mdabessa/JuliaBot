@@ -26,6 +26,7 @@ from juliabot.cogs import reminder as reminder_module
 from juliabot.cogs import server_config as server_config_module
 from juliabot.cogs import twitch as twitch_module
 from juliabot.cogs import utilities as utilities_module
+from juliabot.sessions import Registry, Scope, SessionManager
 
 COG_MODULES = [
     ai_module,
@@ -42,6 +43,8 @@ COG_MODULES = [
     twitch_module,
     utilities_module,
 ]
+
+_UNSET = object()
 
 
 @dataclass(frozen=True)
@@ -71,20 +74,22 @@ class AsyncHistory:
 
 
 class FakeSentMessage:
-    def __init__(self, content=None, embed=None, file=None, channel=None):
+    def __init__(self, content=None, embed=None, file=None, channel=None, view=None):
         self.content = content
         self.embed = embed
         self.file = file
         self.channel = channel
+        self.view = view
         self.edits: list[dict[str, object]] = []
         self.deleted = False
         self.reactions: list[str] = []
 
-    async def edit(self, content=None, embed=None):
+    async def edit(self, content=None, embed=None, view=_UNSET):
         if content is not None:
             self.content = content
-        if embed is not None:
-            self.embed = embed
+        self.embed = embed
+        if view is not _UNSET:
+            self.view = view
         self.edits.append({"content": content, "embed": embed})
 
     async def delete(self):
@@ -134,8 +139,14 @@ class FakeChannel:
         self.sent_messages: list[FakeSentMessage] = []
         self.history_messages: list[object] = []
 
-    async def send(self, content=None, embed=None, file=None):
-        message = FakeSentMessage(content=content, embed=embed, file=file, channel=self)
+    async def send(self, content=None, embed=None, file=None, view=None):
+        message = FakeSentMessage(
+            content=content,
+            embed=embed,
+            file=file,
+            channel=self,
+            view=view,
+        )
         self.sent_messages.append(message)
         return message
 
@@ -181,6 +192,7 @@ class FakeBot:
         self.processed_messages: list[FakeMessage] = []
         self.channel_map: dict[int, FakeChannel] = {}
         self.owner_result = True
+        self.sessions = SessionManager(Registry())
 
     async def get_prefix(self, _message):
         return "!"
@@ -233,11 +245,15 @@ class FakeContext:
             mentions=mentions,
         )
 
-    async def send(self, content=None, embed=None, file=None):
-        return await self.channel.send(content=content, embed=embed, file=file)
+    async def send(self, content=None, embed=None, file=None, view=None):
+        return await self.channel.send(
+            content=content, embed=embed, file=file, view=view
+        )
 
-    async def reply(self, content=None, embed=None, file=None):
-        message = await self.channel.send(content=content, embed=embed, file=file)
+    async def reply(self, content=None, embed=None, file=None, view=None):
+        message = await self.channel.send(
+            content=content, embed=embed, file=file, view=view
+        )
         self.reply_messages.append(message)
         return message
 
@@ -295,7 +311,7 @@ def _make_animes_cog(monkeypatch: pytest.MonkeyPatch, bot: FakeBot):
         def __init__(self, rate_limit=None):
             self.rate_limit = rate_limit
 
-        async def search_anime(self, search_type, query):
+        async def search_anime(self, search_type, query, page=1):
             raise AssertionError(f"unexpected search_anime call for {query}")
 
         async def get_anime(self, mal_id):
@@ -369,34 +385,71 @@ async def _run_ai_history(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> N
     ), "ai::ai_history should render the collected AI history"
 
 
+async def _run_ai_ai_channel(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
+    bot, ctx = _make_ctx(content="!ai_channel")
+    cog = ai_module.AICog(bot)
+
+    await ai_module.AICog.ai_channel.callback(cog, ctx, channel=None)
+
+    rules = bot.sessions.message_rules(ctx.channel.id)
+    assert len(rules) == 1, "ai::ai_channel should start a single channel rule"
+    assert rules[0].registration.name == ai_module.AI_CHANNEL
+    assert ctx.channel.sent_messages[0].view is not None
+    assert ctx.channel.sent_messages[-1].content == (
+        f"IA ativada em {ctx.channel.mention}."
+    )
+
+
+async def _run_ai_ai_channel_disable(
+    monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
+) -> None:
+    bot, ctx = _make_ctx(content="!ai_channel_disable")
+    cog = ai_module.AICog(bot)
+    await ai_module.AICog.ai_channel.callback(cog, ctx, channel=None)
+
+    await ai_module.AICog.ai_channel_disable.callback(cog, ctx, channel=None)
+
+    assert bot.sessions.message_rules(ctx.channel.id) == ()
+    anchor = ctx.channel.sent_messages[0]
+    assert anchor.content == ai_module.AIConversationRule.disabled_text
+    assert anchor.view is None
+    assert ctx.channel.sent_messages[-1].content == "IA desativada neste canal."
+
+
 async def _run_animes_search_anime(
     monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
 ) -> None:
     bot, ctx = _make_ctx(content="!search_anime frieren")
     cog = _make_animes_cog(monkeypatch, bot)
-    script_calls = []
+    ctx.cog = cog
 
-    class FakeScript:
-        def __init__(self, name, function_name, time_out):
-            script_calls.append((name, function_name, time_out))
+    async def fake_search_anime(search_type, query, page=1):
+        return SimpleNamespace(
+            data=[SimpleNamespace(mal_id=1, title="Frieren")],
+            pagination=SimpleNamespace(has_next_page=False, current_page=page),
+        )
 
-        async def execute(self, **kwargs):
-            script_calls.append(kwargs)
+    def fake_anime_embed(anime, _color):
+        return Embed(title=anime.title)
 
-    async def fake_search_anime(search_type, query):
-        return SimpleNamespace(data=[SimpleNamespace(mal_id=1, title="Frieren")])
-
-    monkeypatch.setattr(animes_module, "Script", FakeScript)
+    monkeypatch.setattr(animes_module, "anime_embed", fake_anime_embed)
     cog.jikan.search_anime = fake_search_anime
 
     await animes_module.AnimesCog.search_anime.callback(cog, ctx, anime="Frieren")
 
-    assert (
-        script_calls[0][1] == "search_anime"
-    ), "animes::search_anime should execute the pagination script"
-    assert (
-        script_calls[1]["ctx"] is ctx
-    ), "animes::search_anime should pass the command context to the script"
+    sessions = bot.sessions.active()
+
+    assert len(sessions) == 1
+    session = sessions[0]
+    assert session.registration.name == animes_module.ANIME_SEARCH
+    assert session.registration.timeout == 300
+    assert session.to_payload() == {
+        "index": 0,
+        "query": "Frieren",
+        "jikan_page": 1,
+        "dubbed": False,
+    }
+    assert ctx.reply_messages[0].view is not None
 
 
 async def _run_animes_anime_list(
@@ -404,27 +457,36 @@ async def _run_animes_anime_list(
 ) -> None:
     bot, ctx = _make_ctx(content="!anime_list")
     cog = _make_animes_cog(monkeypatch, bot)
-    script_calls = []
+    ctx.cog = cog
 
-    class FakeScript:
-        def __init__(self, name, function_name, time_out):
-            script_calls.append((name, function_name, time_out))
+    async def fake_get_anime(mal_id):
+        return SimpleNamespace(mal_id=mal_id, title=f"Anime {mal_id}")
 
-        async def execute(self, **kwargs):
-            script_calls.append(kwargs)
+    def fake_anime_embed(anime, _color):
+        return Embed(title=anime.title)
 
-    monkeypatch.setattr(animes_module, "Script", FakeScript)
+    monkeypatch.setattr(animes_module, "anime_embed", fake_anime_embed)
     monkeypatch.setattr(
         animes_module.AnimesList,
         "get_user",
         lambda user_id: [SimpleNamespace(user_id=str(user_id), mal_id=1, dubbed=False)],
     )
+    cog.jikan.get_anime = fake_get_anime
 
     await animes_module.AnimesCog.anime_list.callback(cog, ctx, user=None)
 
-    assert (
-        script_calls[0][1] == "anime_list"
-    ), "animes::anime_list should execute the watchlist script when entries exist"
+    sessions = bot.sessions.active()
+
+    assert len(sessions) == 1
+    session = sessions[0]
+    assert session.registration.name == animes_module.ANIME_LIST
+    assert session.registration.timeout == 300
+
+    await session.wait_for_loading()
+
+    assert session.to_payload() == {"index": 0, "target_user_id": ctx.author.id}
+    assert ctx.reply_messages[0].view is not None
+    assert ctx.reply_messages[0].edits[-1]["embed"].footer.text == "Animes: 1/1"
 
 
 async def _run_animes_add_anime(
@@ -646,16 +708,15 @@ async def _run_debug_reload(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) ->
     ), "debug::reload should finalize the progress message"
 
 
-async def _run_debug_scripts(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
-    bot, ctx = _make_ctx(content="!scripts")
+async def _run_debug_sessions(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
+    bot, ctx = _make_ctx(content="!sessions")
     cog = debug_module.DebugCog(bot)
-    monkeypatch.setattr(debug_module.Script, "get_scripts", lambda: [])
 
-    await debug_module.DebugCog.get_all_scripts.callback(cog, ctx)
+    await debug_module.DebugCog.get_all_sessions.callback(cog, ctx)
 
     assert (
-        ctx.channel.sent_messages[-1].content == "Nenhum script rodando no momento."
-    ), "debug::scripts should explain when there are no live scripts"
+        ctx.channel.sent_messages[-1].content == "Nenhuma sessão rodando no momento."
+    ), "debug::sessions should explain when there are no live sessions"
 
 
 async def _run_debug_exec(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
@@ -679,23 +740,25 @@ async def _run_fun_duel(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> Non
     challenged = FakeUser(808, display_name="rival")
     bot, ctx = _make_ctx(content="!duel", mentions=[challenged])
     cog = fun_module.FunCog(bot)
-    script_calls = []
-
-    class FakeScript:
-        def __init__(self, name, function_name):
-            script_calls.append((name, function_name))
-
-        async def execute(self, **kwargs):
-            script_calls.append(kwargs)
-
-    monkeypatch.setattr(fun_module, "Script", FakeScript)
 
     await fun_module.FunCog.duel.callback(cog, ctx, user=challenged)
 
-    assert script_calls[0] == (
-        f"duel_{ctx.guild.id}",
-        "duel",
-    ), "fun::duel should start the duel script with a guild-scoped key"
+    sessions = bot.sessions.active()
+
+    assert len(sessions) == 1
+    session = sessions[0]
+    assert session.registration.name == fun_module.DUEL
+    assert session.registration.scope is Scope.GUILD
+    assert session.registration.max_per_scope == 2
+    assert session.registration.timeout == 60
+    assert session.to_payload() == {
+        "author_id": ctx.author.id,
+        "vs_id": challenged.id,
+    }
+    assert ctx.channel.sent_messages[-1].content == (
+        f"{ctx.author.mention} desafia {challenged.mention} para um duelo!"
+    )
+    assert ctx.channel.sent_messages[-1].view is not None
 
 
 async def _run_fun_dice(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
@@ -778,16 +841,11 @@ async def _run_help_help(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> No
 async def _run_reminder_list(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
     bot, ctx = _make_ctx(content="!list_reminders")
     cog = reminder_module._ReminderCog(bot)
-    script_calls = []
 
-    class FakeScript:
-        def __init__(self, name, function_name, time_out):
-            script_calls.append((name, function_name, time_out))
+    async def fake_reminder_embed(reminder, _bot):
+        return Embed(title=f"Reminder {reminder.user_id}")
 
-        async def execute(self, **kwargs):
-            script_calls.append(kwargs)
-
-    monkeypatch.setattr(reminder_module, "Script", FakeScript)
+    monkeypatch.setattr(reminder_module, "reminder_embed", fake_reminder_embed)
     monkeypatch.setattr(
         reminder_module.Reminder,
         "get_all",
@@ -796,9 +854,12 @@ async def _run_reminder_list(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -
 
     await reminder_module._ReminderCog.list_reminders.callback(cog, ctx)
 
-    assert (
-        script_calls[0][1] == "list_reminders"
-    ), "reminder::list_reminders should execute the interactive reminder script"
+    sessions = bot.sessions.active()
+    assert len(sessions) == 1
+    assert sessions[0].registration.name == reminder_module.LIST_REMINDERS
+    assert sessions[0].registration.timeout == 180
+    assert sessions[0].to_payload() == {"index": 0}
+    assert ctx.reply_messages[0].view is not None
 
 
 async def _run_reminder_remind_me(
@@ -866,6 +927,44 @@ async def _run_server_config_set_timezone(
     assert (
         server.timezone == "UTC"
     ), "server_config::set_timezone should persist the selected timezone"
+
+
+async def _run_server_config_entrypoint(
+    monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
+) -> None:
+    bot, ctx = _make_ctx(content="!entrypoint")
+    cog = server_config_module.ServerConfigCog(bot)
+
+    await server_config_module.ServerConfigCog.entrypoint.callback(
+        cog, ctx, channel=None
+    )
+
+    rules = bot.sessions.message_rules(ctx.channel.id)
+    assert len(rules) == 1, "server_config::entrypoint should start a channel rule"
+    assert rules[0].registration.name == server_config_module.ENTRY_POINT
+    assert ctx.channel.sent_messages[0].view is not None
+    assert ctx.channel.sent_messages[-1].content == (
+        f"Interação permanente criada em {ctx.channel.mention}."
+    )
+
+
+async def _run_server_config_entrypoint_disable(
+    monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
+) -> None:
+    bot, ctx = _make_ctx(content="!entrypoint_disable")
+    cog = server_config_module.ServerConfigCog(bot)
+    await server_config_module.ServerConfigCog.entrypoint.callback(
+        cog, ctx, channel=None
+    )
+
+    await server_config_module.ServerConfigCog.entrypoint_disable.callback(
+        cog, ctx, channel=None
+    )
+
+    assert bot.sessions.message_rules(ctx.channel.id) == ()
+    anchor = ctx.channel.sent_messages[0]
+    assert anchor.content == server_config_module.ChannelEntryPointRule.disabled_text
+    assert anchor.view is None
 
 
 async def _run_twitch_stream(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
@@ -1007,6 +1106,8 @@ COMMAND_CASES = [
     CommandCase("ai", "ask", _run_ai_ask),
     CommandCase("ai", "breakpoint", _run_ai_breakpoint),
     CommandCase("ai", "ai_history", _run_ai_history),
+    CommandCase("ai", "ai_channel", _run_ai_ai_channel),
+    CommandCase("ai", "ai_channel_disable", _run_ai_ai_channel_disable),
     CommandCase("animes", "search_anime", _run_animes_search_anime),
     CommandCase("animes", "anime_list", _run_animes_anime_list),
     CommandCase("animes", "add_anime", _run_animes_add_anime),
@@ -1023,7 +1124,7 @@ COMMAND_CASES = [
     CommandCase("core", "say", _run_core_say),
     CommandCase("core", "upchat", _run_core_upchat),
     CommandCase("debug", "reload", _run_debug_reload),
-    CommandCase("debug", "scripts", _run_debug_scripts),
+    CommandCase("debug", "sessions", _run_debug_sessions),
     CommandCase("debug", "exec", _run_debug_exec),
     CommandCase("fun", "duel", _run_fun_duel),
     CommandCase("fun", "dice", _run_fun_dice),
@@ -1036,6 +1137,10 @@ COMMAND_CASES = [
     CommandCase("reminder", "remind_me_loop", _run_reminder_remind_me_loop),
     CommandCase("server_config", "set_prefix", _run_server_config_set_prefix),
     CommandCase("server_config", "set_timezone", _run_server_config_set_timezone),
+    CommandCase("server_config", "entrypoint", _run_server_config_entrypoint),
+    CommandCase(
+        "server_config", "entrypoint_disable", _run_server_config_entrypoint_disable
+    ),
     CommandCase("twitch", "stream", _run_twitch_stream),
     CommandCase("twitch", "add_streamer", _run_twitch_add_streamer),
     CommandCase("twitch", "remove_streamer", _run_twitch_remove_streamer),

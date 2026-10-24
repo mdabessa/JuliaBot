@@ -11,6 +11,8 @@ from discord import Game, Intents, Message
 from discord.ext.commands import Bot
 
 from .models import init_db
+from .sessions import PostgresStore, Registry, SessionManager
+from .sessions.transports import MessageTransport, restore_button_views
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,8 @@ class Client(Bot):
 
         self.color = 0xE6DC56
         self.test_mode = test_mode
+        self.sessions = SessionManager(Registry(), PostgresStore())
+        self.session_messages = MessageTransport(self.sessions)
 
         init_db()
 
@@ -44,9 +48,18 @@ class Client(Bot):
         Called during bot initialization to dynamically discover and load
         all modules in juliabot/cogs/.
         """
+        if not hasattr(self, "sessions"):
+            self.sessions = SessionManager(Registry(), PostgresStore())
+            self.session_messages = MessageTransport(self.sessions)
+
         cogs = [file.stem for file in Path("juliabot", "cogs").glob("*.py")]
         for extension in cogs:
             await self.load_extension(f"juliabot.cogs.{extension}")
+
+        records = await self.sessions.restore()
+        restored = restore_button_views(self.sessions, self, records)
+        if restored:
+            logger.info("Restored %d persistent session view(s)", restored)
 
     async def on_ready(self):
         """Handle bot ready event.

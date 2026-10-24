@@ -71,8 +71,9 @@ def test_init_db_logs_summary_when_auto_migration_runs(monkeypatch):
     monkeypatch.setattr(
         models.Model.metadata,
         "create_all",
-        lambda eng: called.setdefault("engine", eng),
+        lambda eng, tables=None: called.setdefault("engine", eng),
     )
+    monkeypatch.setattr("juliabot.migrations.upgrade", lambda engine: ())
     monkeypatch.setattr(
         models,
         "_auto_add_missing_simple_columns",
@@ -96,7 +97,10 @@ def test_init_db_logs_summary_when_auto_migration_runs(monkeypatch):
 def test_init_db_logs_when_no_auto_migration_needed(monkeypatch):
     info_logs = []
 
-    monkeypatch.setattr(models.Model.metadata, "create_all", lambda eng: None)
+    monkeypatch.setattr(
+        models.Model.metadata, "create_all", lambda eng, tables=None: None
+    )
+    monkeypatch.setattr("juliabot.migrations.upgrade", lambda engine: ())
     monkeypatch.setattr(models, "_auto_add_missing_simple_columns", lambda: [])
     monkeypatch.setattr(
         models.logger,

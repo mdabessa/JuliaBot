@@ -12,11 +12,13 @@ from typing import List
 
 import pytz
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Column,
     DateTime,
     Integer,
     String,
+    Text,
     and_,
     create_engine,
     inspect,
@@ -35,6 +37,9 @@ session = Session()
 
 Base = declarative_base()
 logger = logging.getLogger(__name__)
+
+# Tables created by versioned migrations instead of ``create_all``.
+MIGRATION_MANAGED_TABLES = frozenset({"session"})
 
 
 class Model(Base):
@@ -619,13 +624,45 @@ class BotConfig(Model):
         return cls.select_all()
 
 
-def init_db():
-    """Initialize the database schema and apply auto-migrations.
+class SessionRecord(Base):
+    """Persisted snapshot of an interactive session.
 
-    Creates all tables and auto-applies safe schema changes (simple ADD COLUMN
-    operations) to bring the database schema in sync with the model definitions.
+    The ``session`` table is owned by the versioned migration system in
+    ``juliabot/migrations``, not by ``init_db``'s column auto-sync. The session
+    store manages its own transactions for this table.
     """
-    Model.metadata.create_all(engine)
+
+    __tablename__ = "session"
+
+    id = Column(String(32), primary_key=True)
+    kind = Column(String(128), nullable=False)
+    routing_key = Column(String(128), nullable=False, unique=True)
+    trigger = Column(String(16), nullable=False)
+    owner_id = Column(BigInteger, nullable=True)
+    guild_id = Column(BigInteger, nullable=True)
+    channel_id = Column(BigInteger, nullable=True)
+    message_id = Column(BigInteger, nullable=True)
+    scope_key = Column(String(64), nullable=True)
+    payload = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False)
+    last_seen_at = Column(DateTime(timezone=True), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+
+
+def init_db():
+    """Initialize the legacy schema and apply pending schema migrations.
+
+    Legacy tables keep their automatic creation and conservative column sync.
+    Tables listed in ``MIGRATION_MANAGED_TABLES`` are created and evolved only by
+    versioned migrations, so there is a single source of truth for their shape.
+    """
+    legacy_tables = [
+        table
+        for table in Base.metadata.sorted_tables
+        if table.name not in MIGRATION_MANAGED_TABLES
+    ]
+    Base.metadata.create_all(engine, tables=legacy_tables)
+
     applied_columns = _auto_add_missing_simple_columns()
     if applied_columns:
         labels = [f"{table}.{column}" for table, column in applied_columns]
@@ -636,6 +673,19 @@ def init_db():
         )
     else:
         logger.info("Database schema is up to date (no auto migration needed)")
+
+    # Imported lazily so the migration package stays usable from the CLI and
+    # tests without importing the Discord-facing bot modules.
+    from .migrations import upgrade
+
+    applied_migrations = upgrade(engine)
+    if applied_migrations:
+        labels = [f"{item.version:04d} {item.name}" for item in applied_migrations]
+        logger.info(
+            "Applied %d schema migration(s): %s",
+            len(applied_migrations),
+            ", ".join(labels),
+        )
 
 
 def _auto_add_missing_simple_columns() -> List[tuple[str, str]]:
@@ -653,6 +703,8 @@ def _auto_add_missing_simple_columns() -> List[tuple[str, str]]:
     with engine.begin() as connection:
         for table in Base.metadata.sorted_tables:
             if table.name not in existing_tables:
+                continue
+            if table.name in MIGRATION_MANAGED_TABLES:
                 continue
 
             existing_columns = {

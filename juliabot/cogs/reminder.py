@@ -12,7 +12,67 @@ from ..client import Client
 from ..converters import Date, DeltaToDate, NextDate
 from ..embeds.reminder import reminder_embed
 from ..models import Reminder
-from ..scripts import Script
+from ..sessions import (
+    Action,
+    InteractionEvent,
+    Registration,
+    Registry,
+    Scope,
+    SessionManager,
+    TriggerType,
+)
+from ..sessions.patterns import PaginationSession
+
+LIST_REMINDERS = "reminder.list"
+
+
+class ReminderPagination(PaginationSession[Reminder]):
+    """Paginate one user's reminders with owner-only deletion."""
+
+    extra_actions = (
+        Action(
+            "delete",
+            "delete_current",
+            label="Excluir",
+            emoji="❌",
+            style="danger",
+        ),
+    )
+    empty_message = "Você não tem nenhum lembrete!"
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._bot = None
+
+    async def start(self, event: InteractionEvent) -> None:
+        """Capture the runtime bot reference before the first render."""
+        self._bot = getattr(event.raw, "bot", None)
+        await super().start(event)
+
+    async def hydrate(self, event: InteractionEvent | None = None) -> None:
+        """Recover the bot reference from the interaction before rendering."""
+        if event is not None and self._bot is None:
+            self._bot = getattr(event.raw, "client", None)
+        await super().hydrate(event)
+
+    async def load_items(self):
+        """Load the owner's current reminders from the existing model API."""
+        return Reminder.get_all(user_id=self.owner_id)
+
+    async def render_item(self, item: Reminder, index: int, total: int):
+        """Render one reminder with the current position in the list."""
+        embed = await reminder_embed(item, self._bot)
+        embed.set_footer(text=f"{index + 1}/{total} Lembrete(s)")
+        return embed
+
+    async def delete_item(self, item: Reminder, event: InteractionEvent) -> bool:
+        """Delete the selected reminder and announce the deletion."""
+        item.delete()
+        if self._message is not None:
+            await self._message.channel.send(
+                f"Lembrete de `{item.get_date_str()}` deletado com sucesso!"
+            )
+        return True
 
 
 class _ReminderCog(commands.Cog, name="reminder"):
@@ -26,62 +86,24 @@ class _ReminderCog(commands.Cog, name="reminder"):
 
     def __init__(self, bot: Client) -> None:
         self.bot = bot
+        if not hasattr(bot, "sessions"):
+            bot.sessions = SessionManager(Registry())
+        if bot.sessions.registry.get(LIST_REMINDERS) is None:
+            bot.sessions.registry.register(
+                Registration(
+                    name=LIST_REMINDERS,
+                    session_class=ReminderPagination,
+                    trigger=TriggerType.COMPONENT,
+                    scope=Scope.USER,
+                    timeout=180,
+                    max_per_scope=1,
+                    resumable=True,
+                )
+            )
 
     @commands.Cog.listener()
     async def on_ready(self):
         self.reminder.start()
-
-    @staticmethod
-    @Script.function(name="list_reminders", events=["on_reaction_add"])
-    async def _list_reminders(cache: dict, **kwargs):
-        if cache["status"] == "created":
-            cache["status"] = "started"
-            cache["bot"] = kwargs["bot"]
-            cache["reminders"] = kwargs["reminders"]
-            cache["index"] = 0
-
-            reminder = cache["reminders"][cache["index"]]
-            embed = await reminder_embed(reminder, cache["bot"])
-            embed.set_footer(text=f"1/{len(cache['reminders'])} Lembrete(s)")
-
-            cache["message"] = await kwargs["ctx"].reply(embed=embed)
-
-            await cache["message"].add_reaction("⬅️")
-            await cache["message"].add_reaction("➡️")
-            await cache["message"].add_reaction("❌")
-
-        elif cache["status"] == "started":
-            index = cache["index"]
-            reminder = cache["reminders"][cache["index"]]
-            if kwargs["emoji"] == "⬅️":
-                index -= 1
-            elif kwargs["emoji"] == "➡️":
-                index += 1
-            elif kwargs["emoji"] == "❌" and kwargs["user"].id == int(reminder.user_id):
-                cache["reminders"].remove(reminder)
-                reminder.delete()
-                await cache["message"].channel.send(
-                    f"Lembrete de `{reminder.get_date_str()}` deletado com sucesso!"
-                )
-
-            if index < 0:
-                index = len(cache["reminders"]) - 1
-            elif index >= len(cache["reminders"]):
-                index = 0
-
-            if cache["reminders"]:
-                cache["index"] = index
-                reminder = cache["reminders"][cache["index"]]
-                embed = await reminder_embed(reminder, cache["bot"])
-                embed.set_footer(
-                    text=f"{index + 1}/{len(cache['reminders'])} Lembrete(s)"
-                )
-                await cache["message"].edit(embed=embed)
-            else:
-                await cache["message"].edit(
-                    content="Você não tem nenhum lembrete!", embed=None
-                )
-                cache["status"] = 0
 
     @commands.command(
         brief="Mostra todos os seus lembretes!",
@@ -92,13 +114,16 @@ class _ReminderCog(commands.Cog, name="reminder"):
         if not reminders:
             return await ctx.reply("Você não tem nenhum lembrete!")
 
-        scr = Script(
-            name=f"{ctx.author.id}_list_reminders",
-            function_name="list_reminders",
-            time_out=180,
+        event = InteractionEvent(
+            transport=TriggerType.COMPONENT,
+            key=str(ctx.message.id),
+            user_id=ctx.author.id,
+            guild_id=getattr(ctx.guild, "id", None),
+            channel_id=ctx.channel.id,
+            message_id=ctx.message.id,
+            raw=ctx,
         )
-
-        await scr.execute(bot=self.bot, ctx=ctx, reminders=reminders)
+        await self.bot.sessions.start(LIST_REMINDERS, event)
 
     @commands.command(
         brief="Irei te notificar no dia desejado, relembrando sua mensagem!",

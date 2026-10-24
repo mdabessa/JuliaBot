@@ -4,6 +4,8 @@ from types import SimpleNamespace
 import pytest
 
 from juliabot.client import Client
+from juliabot.sessions import MemoryStore, SessionManager
+from juliabot.sessions.transports import MessageTransport
 
 
 @pytest.mark.asyncio
@@ -11,6 +13,7 @@ async def test_client_initialization_loads_cogs(monkeypatch):
     loaded = []
 
     monkeypatch.setattr("juliabot.client.init_db", lambda: None)
+    monkeypatch.setattr("juliabot.client.PostgresStore", MemoryStore)
 
     def fake_bot_init(self, **options):
         return None
@@ -34,6 +37,8 @@ async def test_client_initialization_loads_cogs(monkeypatch):
     await client.setup_hook()
 
     assert loaded == ["juliabot.cogs.core", "juliabot.cogs.help"]
+    assert isinstance(client.sessions, SessionManager)
+    assert isinstance(client.session_messages, MessageTransport)
 
 
 @pytest.mark.asyncio

@@ -5,7 +5,8 @@ watchlist with Jikan API integration.
 """
 
 import logging
-from typing import Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional
 
 from discord import TextChannel
 from discord import User as DUser
@@ -17,9 +18,244 @@ from ..client import Client
 from ..config import BOT_JIKAN_RATE_LIMIT
 from ..embeds.anime import anime_embed, episode_embed
 from ..models import AnimesList, AnimesNotifier, Server, User
-from ..scripts import Script
+from ..sessions import (
+    Action,
+    InteractionEvent,
+    Registration,
+    Registry,
+    Scope,
+    SessionManager,
+    TriggerType,
+)
+from ..sessions.patterns import PaginationSession
+
+if TYPE_CHECKING:
+    from jikan4.models import Anime
 
 logger = logging.getLogger(__name__)
+
+ANIME_SEARCH = "animes.search"
+ANIME_LIST = "animes.list"
+
+
+def _bind_runtime(session, context) -> None:
+    """Bind the shared Jikan client and embed color from a context.
+
+    Commands expose the bot as ``context.bot``; component interactions expose it
+    as ``context.client``. Both paths end up on the bot, which owns the shared
+    Jikan client.
+    """
+    bot = getattr(context, "bot", None) or getattr(context, "client", None)
+    if bot is None:
+        return
+    session._jikan = bot.jikan
+    session._color = bot.color
+
+
+@dataclass(frozen=True)
+class AnimeEntry:
+    """Runtime pair of a Jikan anime and the user's watchlist row."""
+
+    anime: "Anime"
+    entry: AnimesList
+
+
+class AnimeSearchPagination(PaginationSession["Anime"]):
+    """Paginate a Jikan search, fetching adjacent Jikan pages on demand."""
+
+    extra_actions = (
+        Action("add", "add_current", owner_only=False, label="Adicionar", emoji="📝"),
+    )
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._jikan = None
+        self._color = 0
+        self._pagination = None
+
+    @property
+    def query(self) -> str:
+        """Return the search query stored in the payload."""
+        value = self._payload.get("query", "")
+        return value if isinstance(value, str) else ""
+
+    @property
+    def jikan_page(self) -> int:
+        """Return the Jikan result page currently loaded."""
+        value = self._payload.get("jikan_page", 1)
+        return int(value) if isinstance(value, (int, float)) else 1
+
+    @property
+    def dubbed(self) -> bool:
+        """Return whether results are treated as dubbed."""
+        return bool(self._payload.get("dubbed", False))
+
+    async def start(self, event: InteractionEvent) -> None:
+        """Capture runtime dependencies, then load the first Jikan page."""
+        context = event.raw
+        if context is None or getattr(context, "cog", None) is None:
+            raise RuntimeError("Anime sessions require an invoking cog context")
+        _bind_runtime(self, context)
+        await super().start(event)
+
+    async def hydrate(self, event: InteractionEvent | None = None) -> None:
+        """Rebind the shared Jikan client before reloading the page."""
+        if event is not None:
+            _bind_runtime(self, event.raw)
+        await super().hydrate(event)
+
+    async def load_items(self) -> list["Anime"]:
+        """Fetch one Jikan page and keep its pagination metadata."""
+        result = await self._jikan.search_anime(
+            search_type="tv", query=self.query, page=self.jikan_page
+        )
+        self._pagination = result.pagination
+        return list(result.data)
+
+    async def load_more(self, direction: int) -> bool:
+        """Fetch the adjacent Jikan page when navigation hits a boundary."""
+        page = self.jikan_page + direction
+        if page < 1:
+            return False
+        if direction > 0 and not getattr(self._pagination, "has_next_page", False):
+            return False
+        if direction < 0 and self.jikan_page <= 1:
+            return False
+
+        self.set_payload("jikan_page", page)
+        items = list(await self.load_items())
+        if not items:
+            self.set_payload("jikan_page", page - direction)
+            return False
+
+        self._items = items
+        self.set_payload("index", 0 if direction > 0 else len(items) - 1)
+        await self.render()
+        return True
+
+    async def render_item(self, item: "Anime", index: int, total: int):
+        """Render one search result with its position in the Jikan page."""
+        embed = anime_embed(item, self._color)
+        embed.set_footer(text=f"Anime {index + 1} de {total}")
+        return embed
+
+    async def add_current(self, event: InteractionEvent) -> None:
+        """Add the current result to the acting user's watchlist."""
+        item = self._items[self.index]
+        if AnimesList.get(
+            user_id=event.user_id, mal_id=item.mal_id, dubbed=self.dubbed
+        ):
+            await self._message.channel.send(f"`{item.title}` já está na sua lista!")
+            return
+
+        AnimesList(user_id=event.user_id, mal_id=item.mal_id, dubbed=self.dubbed)
+        title = item.title if not self.dubbed else f"{item.title} (Dublado)"
+        await self._message.channel.send(f"`{title}` adicionado a lista!")
+
+    def to_payload(self) -> dict:
+        """Persist only the search coordinates and current index."""
+        return {
+            "index": self.index,
+            "query": self.query,
+            "jikan_page": self.jikan_page,
+            "dubbed": self.dubbed,
+        }
+
+
+class AnimeListPagination(PaginationSession[AnimeEntry]):
+    """Progressively load and paginate one user's anime watchlist."""
+
+    progressive = True
+    loading_message = "Buscando animes..."
+    empty_message = "A lista de animes está vazia."
+    extra_actions = (
+        Action(
+            "delete",
+            "delete_current",
+            owner_only=False,
+            label="Remover",
+            emoji="❌",
+            style="danger",
+        ),
+    )
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._jikan = None
+        self._color = 0
+        self._expected = 0
+        self._searching = False
+
+    @property
+    def target_user_id(self) -> int:
+        """Return the watchlist owner's id from the payload."""
+        value = self._payload.get("target_user_id", 0)
+        return int(value) if isinstance(value, (int, float)) else 0
+
+    async def start(self, event: InteractionEvent) -> None:
+        """Capture runtime dependencies and begin progressive loading."""
+        context = event.raw
+        if context is None or getattr(context, "cog", None) is None:
+            raise RuntimeError("Anime sessions require an invoking cog context")
+        _bind_runtime(self, context)
+        self._searching = True
+        await super().start(event)
+
+    async def hydrate(self, event: InteractionEvent | None = None) -> None:
+        """Rebind the Jikan client before reloading the watchlist."""
+        if event is not None:
+            _bind_runtime(self, event.raw)
+        await super().hydrate(event)
+
+    async def load_rows(self) -> list[AnimesList]:
+        """Load the watchlist rows backing this session."""
+        rows = AnimesList.get_user(user_id=self.target_user_id)
+        self._expected = len(rows)
+        return rows
+
+    async def iter_items(self):
+        """Yield anime details one at a time while the list loads."""
+        for row in await self.load_rows():
+            anime = await self._jikan.get_anime(row.mal_id)
+            if row.dubbed:
+                anime.title = f"{anime.title} (Dublado)"
+            yield AnimeEntry(anime=anime, entry=row)
+
+    async def load_items(self):
+        """Load the whole list eagerly for hydration and refresh paths."""
+        return [item async for item in self.iter_items()]
+
+    async def on_loading_finished(self) -> None:
+        """Drop the search-progress footer once loading completes."""
+        self._searching = False
+        await self.render()
+
+    async def render_item(self, item: AnimeEntry, index: int, total: int):
+        """Render one watchlist entry, including search progress."""
+        embed = anime_embed(item.anime, self._color)
+        if self._searching:
+            embed.set_footer(
+                text=(
+                    f"Animes: {index + 1}/{total} - "
+                    f"Pesquisando: {total}/{self._expected}"
+                )
+            )
+        else:
+            embed.set_footer(text=f"Animes: {index + 1}/{total}")
+        return embed
+
+    async def delete_item(self, item: AnimeEntry, event: InteractionEvent) -> bool:
+        """Remove an entry only when the acting user owns it."""
+        if str(item.entry.user_id) != str(event.user_id):
+            return False
+        item.entry.delete()
+        if self._message is not None:
+            await self._message.channel.send(f"`{item.anime.title}` removido da lista!")
+        return True
+
+    def to_payload(self) -> dict:
+        """Persist only the index and the watchlist owner id."""
+        return {"index": self.index, "target_user_id": self.target_user_id}
 
 
 class AnimesCog(commands.Cog, name="animes"):
@@ -34,173 +270,50 @@ class AnimesCog(commands.Cog, name="animes"):
     def __init__(self, bot: Client) -> None:
         self.bot = bot
         self.jikan = AioJikan(rate_limit=BOT_JIKAN_RATE_LIMIT)
+        # Shared with restored sessions, which only have the interaction client.
+        bot.jikan = self.jikan
+        if not hasattr(bot, "sessions"):
+            bot.sessions = SessionManager(Registry())
+        self._register_sessions()
+
+    def _register_sessions(self) -> None:
+        """Register the anime sessions once per bot instance."""
+        registrations = (
+            Registration(
+                name=ANIME_SEARCH,
+                session_class=AnimeSearchPagination,
+                trigger=TriggerType.COMPONENT,
+                scope=Scope.USER,
+                timeout=300,
+                max_per_scope=1,
+                resumable=True,
+            ),
+            Registration(
+                name=ANIME_LIST,
+                session_class=AnimeListPagination,
+                trigger=TriggerType.COMPONENT,
+                scope=Scope.USER,
+                timeout=300,
+                max_per_scope=1,
+                resumable=True,
+            ),
+        )
+        for registration in registrations:
+            if self.bot.sessions.registry.get(registration.name) is None:
+                self.bot.sessions.registry.register(registration)
 
     @staticmethod
-    @Script.function(name="search_anime", events=["on_reaction_add"])
-    async def search_anime(cache: dict, **kwargs) -> None:
-        if cache["status"] == "created":
-            cache["status"] = "started"
-            cache["color"] = kwargs["color"]
-            cache["dubbed"] = kwargs["dubbed"]
-            cache["anime_search"] = kwargs["anime_search"]
-            cache["index"] = 0
-
-            embed = anime_embed(
-                cache["anime_search"].data[cache["index"]], cache["color"]
-            )
-            embed.set_footer(
-                text=f"Anime {cache['index'] + 1} de {len(cache['anime_search'].data)}"
-            )
-
-            message = await kwargs["ctx"].send(embed=embed)
-            await message.add_reaction("⬅️")
-            await message.add_reaction("➡️")
-            await message.add_reaction("📝")
-            cache["message"] = message
-
-        else:
-            if kwargs["emoji"] == "⬅️":
-                cache["index"] -= 1
-            elif kwargs["emoji"] == "➡️":
-                cache["index"] += 1
-
-            if kwargs["emoji"] == "📝":
-                if AnimesList.get(
-                    user_id=kwargs["user"].id,
-                    mal_id=cache["anime_search"].data[cache["index"]].mal_id,
-                    dubbed=cache["dubbed"],
-                ):
-                    await cache["message"].channel.send(
-                        f"`{cache['anime_search'].data[cache['index']].title}` já está na sua lista!"
-                    )
-                else:
-                    AnimesList(
-                        user_id=kwargs["user"].id,
-                        mal_id=cache["anime_search"].data[cache["index"]].mal_id,
-                        dubbed=cache["dubbed"],
-                    )
-
-                    anime_title = cache["anime_search"].data[cache["index"]].title
-                    anime_title = (
-                        anime_title
-                        if not cache["dubbed"]
-                        else f"{anime_title} (Dublado)"
-                    )
-
-                    await cache["message"].channel.send(
-                        f"`{anime_title}` adicionado a lista!"
-                    )
-
-            if cache["index"] < 0:
-                cache["index"] = len(cache["anime_search"].data) - 1
-            elif cache["index"] > len(cache["anime_search"].data) - 1:
-                cache["index"] = 0
-
-            embed = anime_embed(
-                cache["anime_search"].data[cache["index"]], cache["color"]
-            )
-            embed.set_footer(
-                text=f"Anime {cache['index'] + 1} de {len(cache['anime_search'].data)}"
-            )
-            await cache["message"].edit(embed=embed)
-
-    @staticmethod
-    @Script.function(name="anime_list", events=["on_reaction_add"])
-    async def _anime_list(cache: dict, **kwargs) -> None:
-        if cache["status"] == "created":
-            cache["status"] = "searching"
-            cache["color"] = kwargs["color"]
-            cache["jikan"] = kwargs["jikan"]
-            cache["anime_list"] = kwargs["animes"]
-            cache["animes"] = []
-            cache["index"] = 0
-
-            message = await kwargs["ctx"].send("Buscando animes...")
-            await message.add_reaction("⬅️")
-            await message.add_reaction("➡️")
-            await message.add_reaction("❌")
-            cache["message"] = message
-
-            for i in cache["anime_list"]:
-                anime = await cache["jikan"].get_anime(i.mal_id)
-
-                if i.dubbed:
-                    anime.title = f"{anime.title} (Dublado)"
-
-                cache["animes"].append(anime)
-
-                # The list and the index can be modified while the bot is searching for the animes
-                if len(cache["animes"]):
-                    if cache["index"] < 0:
-                        cache["index"] = len(cache["animes"]) - 1
-                    elif cache["index"] > len(cache["animes"]) - 1:
-                        cache["index"] = 0
-
-                    embed = anime_embed(cache["animes"][cache["index"]], cache["color"])
-                    embed.set_footer(
-                        text=f"Animes: {cache['index'] + 1}/{len(cache['animes'])} - Pesquisando: {len(cache['animes'])}/{len(cache['anime_list'])}"
-                    )
-                    await message.edit(embed=embed, content=None)
-
-                else:
-                    await message.edit(
-                        embed=None, content="A lista de animes está vazia."
-                    )
-
-            cache["status"] = "started"
-
-        elif cache["status"] == "searching":  # Will be updated in the for loop above
-            index = cache["index"]
-            if kwargs["emoji"] == "❌" and cache["anime_list"][index].user_id == str(
-                kwargs["user"].id
-            ):  # Delete the anime from the list
-                cache["anime_list"][index].delete()
-                await cache["message"].channel.send(
-                    f'`{cache["animes"][index].title}` removido da lista!'
-                )
-                cache["animes"].pop(index)
-                cache["anime_list"].pop(index)
-
-            if kwargs["emoji"] == "⬅️":
-                index -= 1
-            elif kwargs["emoji"] == "➡️":
-                index += 1
-
-            cache["index"] = index
-
-        else:
-            index = cache["index"]
-            if kwargs["emoji"] == "❌" and cache["anime_list"][index].user_id == str(
-                kwargs["user"].id
-            ):
-                cache["anime_list"][index].delete()
-                await cache["message"].channel.send(
-                    f'`{cache["animes"][index].title}` removido da lista!'
-                )
-                cache["animes"].pop(index)
-                cache["anime_list"].pop(index)
-
-            if kwargs["emoji"] == "⬅️":
-                index -= 1
-            elif kwargs["emoji"] == "➡️":
-                index += 1
-
-            if index < 0:
-                index = len(cache["animes"]) - 1
-            elif index > len(cache["animes"]) - 1:
-                index = 0
-
-            cache["index"] = index
-
-            if len(cache["animes"]):
-                embed = anime_embed(cache["animes"][index], cache["color"])
-                embed.set_footer(text=f"Animes: {index + 1}/{len(cache['animes'])}")
-                await cache["message"].edit(embed=embed, content=None)
-
-            else:
-                await cache["message"].edit(
-                    embed=None, content="A lista de animes está vazia."
-                )
+    def _session_event(ctx: commands.Context) -> InteractionEvent:
+        """Build a normalized interaction event from a command invocation."""
+        return InteractionEvent(
+            transport=TriggerType.COMPONENT,
+            key=str(ctx.message.id),
+            user_id=ctx.author.id,
+            guild_id=getattr(ctx.guild, "id", None),
+            channel_id=ctx.channel.id,
+            message_id=ctx.message.id,
+            raw=ctx,
+        )
 
     @commands.cooldown(1, 4, commands.BucketType.user)
     @commands.command(
@@ -215,18 +328,12 @@ class AnimesCog(commands.Cog, name="animes"):
             dubbed = True
             anime = anime[:-8]
 
-        animes = await self.jikan.search_anime(search_type="tv", query=anime)
-        if animes.data:
-            scr = Script(
-                name=f"{ctx.author.id}_search_anime",
-                function_name="search_anime",
-                time_out=300,
-            )
-            await scr.execute(
-                ctx=ctx, anime_search=animes, color=self.bot.color, dubbed=dubbed
-            )
-
-        else:
+        session = await self.bot.sessions.start(
+            ANIME_SEARCH,
+            self._session_event(ctx),
+            payload={"query": anime, "jikan_page": 1, "dubbed": dubbed},
+        )
+        if session.closed:
             await ctx.send(f"Não foi encontrado nenhum anime com o nome `{anime}`.")
 
     @commands.cooldown(1, 4, commands.BucketType.user)
@@ -243,18 +350,15 @@ class AnimesCog(commands.Cog, name="animes"):
             user = ctx.author
 
         animes = AnimesList.get_user(user_id=user.id)
-        if animes:
-            scr = Script(
-                name=f"{ctx.author.id}_anime_list",
-                function_name="anime_list",
-                time_out=300,
-            )
-            await scr.execute(
-                ctx=ctx, animes=animes, color=self.bot.color, jikan=self.jikan
-            )
-
-        else:
+        if not animes:
             await ctx.send(f"{user.mention} não tem nenhum anime na lista.")
+            return
+
+        await self.bot.sessions.start(
+            ANIME_LIST,
+            self._session_event(ctx),
+            payload={"target_user_id": user.id},
+        )
 
     @commands.cooldown(1, 4, commands.BucketType.user)
     @commands.command(

@@ -107,7 +107,8 @@ async def test_reminder_pagination_deletes_only_for_owner(monkeypatch):
     )
     assert reminders[0].deleted is True
     assert session.closed is True
-    assert context.replies[0].edits[-1] == {
+    assert context.replies[0].edits[-2] == {
         "content": "Você não tem nenhum lembrete!",
         "embed": None,
     }
+    assert context.replies[0].edits[-1] == {"view": None}

@@ -18,6 +18,8 @@ from juliabot.sessions import (
     TriggerType,
 )
 
+_UNSET = object()
+
 
 class FakeJikan:
     """Minimal Jikan double with page-aware search results."""
@@ -56,7 +58,9 @@ class FakeMessage:
         self.view = view
         self.edits = []
 
-    async def edit(self, content=None, embed=None):
+    async def edit(self, content=None, embed=None, view=_UNSET):
+        if view is not _UNSET:
+            self.view = view
         self.edits.append((content, embed))
 
 

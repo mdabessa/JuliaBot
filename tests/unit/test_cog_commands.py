@@ -84,13 +84,15 @@ class FakeSentMessage:
         self.deleted = False
         self.reactions: list[str] = []
 
-    async def edit(self, content=None, embed=None, view=_UNSET):
-        if content is not None:
+    async def edit(self, content=_UNSET, embed=_UNSET, view=_UNSET):
+        """Mirror discord.py's MISSING semantics for omitted arguments."""
+        if content is not _UNSET:
             self.content = content
-        self.embed = embed
+        if embed is not _UNSET:
+            self.embed = embed
         if view is not _UNSET:
             self.view = view
-        self.edits.append({"content": content, "embed": embed})
+        self.edits.append({"content": content, "embed": embed, "view": view})
 
     async def delete(self):
         self.deleted = True
@@ -197,6 +199,9 @@ class FakeBot:
     async def get_prefix(self, _message):
         return "!"
 
+    async def can_run(self, _ctx):
+        return True
+
     def get_command(self, name: str):
         for cog in self.cogs.values():
             for command in cog.get_commands():
@@ -236,6 +241,7 @@ class FakeContext:
         self.channel = channel or FakeChannel(1, guild=guild)
         self.author = author or FakeUser(1)
         self.prefix = prefix
+        self.command = None
         self.reply_messages: list[FakeSentMessage] = []
         self.message = FakeMessage(
             content=content,
@@ -833,9 +839,56 @@ async def _run_help_help(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> No
 
     await help_module.HelpCog.help.callback(help_cog, ctx, argument=None)
 
+    message = ctx.reply_messages[-1]
     assert (
-        ctx.channel.sent_messages[-1].embed.title == "Lista de Comandos"
+        message.embed.title == "Lista de Comandos"
     ), "help::help should render the global help embed"
+    assert (
+        message.embed.footer.text == "Página 1/1"
+    ), "help::help should number the first help page"
+    assert message.view is not None, "help::help should attach navigation buttons"
+
+    values = " ".join(field.value for field in message.embed.fields)
+    assert "`help` (ajuda)" in values, "help::help should list command aliases"
+    assert ":question:Help." in [
+        field.name for field in message.embed.fields
+    ], "help::help should title each field with its cog"
+
+
+async def _run_help_help_cog_jump(
+    monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
+) -> None:
+    bot, ctx = _make_ctx(content="!help !help")
+    core_cog = core_module.CoreCog(bot)
+    help_cog = help_module.HelpCog(bot)
+    bot.cogs = {"core": core_cog, "help": help_cog}
+
+    await help_module.HelpCog.help.callback(help_cog, ctx, argument="!help")
+
+    sessions = bot.sessions.active()
+    assert len(sessions) == 1, "help::help should start one page session"
+    assert sessions[0].registration.name == help_module.HELP_PAGES
+    assert (
+        sessions[0].to_payload()["index"] == 0
+    ), "help::help !<cog> should open the page holding that cog"
+    assert ctx.reply_messages[-1].embed.fields[0].name == ":question:Help."
+
+
+async def _run_help_help_command_detail(
+    monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
+) -> None:
+    bot, ctx = _make_ctx(content="!help ping")
+    core_cog = core_module.CoreCog(bot)
+    help_cog = help_module.HelpCog(bot)
+    bot.cogs = {"core": core_cog, "help": help_cog}
+
+    await help_module.HelpCog.help.callback(help_cog, ctx, argument="ping")
+
+    message = ctx.channel.sent_messages[-1]
+    assert (
+        message.embed.title == "!ping"
+    ), "help::help <command> should keep the one-shot detail embed"
+    assert bot.sessions.active() == ()
 
 
 async def _run_reminder_list(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:

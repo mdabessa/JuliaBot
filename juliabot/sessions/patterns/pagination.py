@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 from typing import AsyncIterator, Generic, Sequence, TypeVar
 
+from discord.errors import HTTPException
+
 from ..session import Session
 from ..transports.buttons import build_button_view
 from ..types import Action, InteractionEvent, JSONValue
@@ -189,11 +191,29 @@ class PaginationSession(Session, Generic[Item]):
             await self._message.edit(content=self.empty_message, embed=None)
 
     async def close(self) -> None:
-        """Close the session and stop any progressive loader."""
+        """Close the session, stop the loader, and drop the message's view."""
+        if self.closed:
+            return
         task = self._loading_task
         if task is not None and task is not asyncio.current_task() and not task.done():
             task.cancel()
+        await self._detach_view()
         await super().close()
+
+    async def _detach_view(self) -> None:
+        """Best-effort removal of the buttons from the original message.
+
+        Closed sessions are no longer routable, so leaving the view in place
+        makes the buttons look alive while every click silently no-ops. Only
+        the view is cleared: content and embeds stay readable.
+        """
+        message = self._message
+        if message is None:
+            return
+        try:
+            await message.edit(view=None)
+        except (HTTPException, AttributeError):
+            pass
 
     async def refresh_items(self) -> None:
         """Reload items and render the current page when possible."""

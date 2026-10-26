@@ -132,10 +132,11 @@ async def test_pagination_delete_mutates_items_and_closes_when_empty():
     await manager.dispatch(event(context, action="delete"))
 
     assert session.closed is True
-    assert session._message.edits[-1] == {
+    assert session._message.edits[-2] == {
         "content": "Não há itens para exibir.",
         "embed": None,
     }
+    assert session._message.edits[-1] == {"view": None}
 
 
 @pytest.mark.asyncio

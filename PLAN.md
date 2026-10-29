@@ -187,14 +187,18 @@ def build_command(cog, spec) -> commands.Command
 Rules:
 
 1. Tokenize `raw` on whitespace, honoring `"quoted values"` (needed for
-   `q="full metal"`).
+   `query="full metal"`). A quote only opens a quoted group at a token start or
+   right after `=`, so `k-on's` stays a literal value instead of failing as an
+   unbalanced quote.
 2. Tokens without `=` fill `spec.positional_names` in declaration order (the
    required parameters, plus the route's `q`/`query` search term); extras are an
    error (never silently dropped).
 3. Tokens with `=` must match a declared param of the route; unknown key →
    error listing the valid keys.
-4. Coerce by `ParamSpec.annotation`: `int`, `float`, `bool`
-   (`yes/no/true/false/1/0/on/off`, plus bare flag presence), `str`.
+4. Coerce by `ParamSpec.annotation`: `int`, `float`, `bool`, `str`.
+   Booleans accept `yes/no`, `sim/não`, `true/false`, `1/0`, `on/off`.
+   A bare boolean name is a flag (`sfw` → `sfw=True`), but only once every
+   positional slot is filled, so `!search_manga sfw` still searches for "sfw".
    Bad value → error naming the key and the expected type.
 5. Duplicate key / duplicate positional → error.
 6. Errors are `commands.UserInputError` subclasses carrying a pt-BR message, so
@@ -348,8 +352,14 @@ Nothing is registered → zero behaviour change, safe to land first.
 | `feat(jikan): parse positional and key=value command arguments` | `juliabot/jikan_args.py` |
 | `test(jikan): cover argument parsing` | `tests/unit/test_jikan_args.py` |
 
-Tests: positional fill, `k=v` coercion for each type, quoted values, unknown
-key, missing required, duplicate key, overflow positional, bool spellings.
+Tests: positional fill, `k=v` coercion for each type, quoted values (including
+an apostrophe inside a value), unknown key, missing required, duplicate key,
+overflow positional, bool spellings and bare boolean flags.
+
+Deliberate scope: the parser returns only the arguments the user supplied and
+raises `JikanArgumentError` (a `commands.UserInputError`); the generated
+commands in step 3 catch it and answer with the message, so
+`error_handler.py` stays untouched.
 
 ### Step 3 — `feat/jikan-command-generator`
 | Commit | Contents |

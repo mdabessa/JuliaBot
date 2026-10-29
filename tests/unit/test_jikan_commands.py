@@ -29,10 +29,14 @@ class FakeClient:
 
 class FakeContext:
     def __init__(self):
-        self.sent: list[str] = []
+        self.sent: list[dict] = []
 
-    async def send(self, content=None, **_kwargs):
-        self.sent.append(content)
+    async def send(self, content=None, **kwargs):
+        self.sent.append({"content": content, **kwargs})
+
+    @property
+    def contents(self) -> list[str]:
+        return [message["content"] for message in self.sent if message["content"]]
 
 
 class FakeCog:
@@ -105,7 +109,7 @@ async def test_dispatch_calls_the_route_with_parsed_arguments(themes):
     await command.callback(cog, ctx, raw="1")
 
     assert client.calls == [("get_anime_themes", {"anime_id": 1})]
-    assert ctx.sent and "openings" in ctx.sent[0]
+    assert ctx.sent[0]["embeds"][0].fields[0].value == "Theme"
 
 
 @pytest.mark.asyncio
@@ -131,7 +135,7 @@ async def test_argument_errors_are_answered_without_calling_the_api(themes):
     await command.callback(cog, ctx, raw="abc")
 
     assert client.calls == []
-    assert "`anime_id` precisa ser um número inteiro" in ctx.sent[0]
+    assert "`anime_id` precisa ser um número inteiro" in ctx.contents[0]
 
 
 @pytest.mark.asyncio
@@ -142,20 +146,21 @@ async def test_missing_client_is_reported(themes):
 
     await command.callback(cog, ctx, raw="1")
 
-    assert "não está disponível" in ctx.sent[0]
+    assert "não está disponível" in ctx.contents[0]
 
 
 @pytest.mark.asyncio
-async def test_long_payloads_are_split_into_valid_messages(themes):
-    client = FakeClient(data={"data": {"items": list(range(500))}})
+async def test_payloads_are_rendered_into_one_message(themes):
+    client = FakeClient(data={"data": {"openings": ["OP1"], "endings": ["ED1"]}})
     cog = FakeCog(jikan=client)
     command = generator.build_command(cog, themes)
     ctx = FakeContext()
 
     await command.callback(cog, ctx, raw="1")
 
-    assert len(ctx.sent) > 1
-    assert all(len(message) <= generator.MAX_MESSAGE_LENGTH for message in ctx.sent)
+    assert len(ctx.sent) == 1
+    fields = {field.name: field.value for field in ctx.sent[0]["embeds"][0].fields}
+    assert fields == {"Openings": "OP1", "Endings": "ED1"}
 
 
 def test_build_commands_skips_curated_routes():
@@ -206,21 +211,16 @@ def test_build_commands_skips_duplicate_labels_inside_one_batch(caplog, themes):
     assert "was already generated" in caplog.text
 
 
-def test_split_message_keeps_every_character():
-    text = "\n".join(f"line {index}" for index in range(400))
+@pytest.mark.asyncio
+async def test_send_rendered_sends_a_json_attachment(themes, monkeypatch):
+    from juliabot.jikan_render import RenderResult
 
-    chunks = generator._split_message(text, limit=100)
+    attachment = object()
+    ctx = FakeContext()
 
-    assert all(len(chunk) <= 100 for chunk in chunks)
-    assert "".join(chunks) == text
+    await generator.send_rendered(ctx, RenderResult(content=None, file=attachment))
 
-
-def test_split_message_breaks_a_single_oversized_line():
-    text = "x" * 250
-
-    chunks = generator._split_message(text, limit=100)
-
-    assert [len(chunk) for chunk in chunks] == [100, 100, 50]
+    assert ctx.sent == [{"content": None, "file": attachment}]
 
 
 @pytest.mark.asyncio

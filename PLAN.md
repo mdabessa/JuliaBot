@@ -222,21 +222,28 @@ param is typed automatically.
 
 ### 3.4 Renderers — `juliabot/jikan_render.py`
 
-`render(payload, spec, color) -> Embed | list[Embed] | str | File`:
+`render(payload, spec, color) -> RenderResult` where `RenderResult` carries
+`content`, `embeds` and/or `file` for one Discord message:
 
 | Input | Output |
 |-------|--------|
-| `data: list` + `pagination` | `GenericRoutePagination(PaginationSession)`; payload `{route, kwargs, index}` (JSON-only, resumable) |
-| `data: list`, no pagination | one embed, items packed into fields/chunks |
-| `data: object` | key/value embed, nested lists flattened (`AnimeThemes.openings`) |
-| root entity (`Anime`, `Character`, `StackDetail`, …) | entity embed: title, url, image, short field subset |
-| oversized | fenced JSON chunked to 2000 chars; if > 3500 chars, `.json` attachment |
+| `data: list` (with or without `pagination`) | bullet pages, at most 10 embeds, footer with `N resultado(s) • página i/N` plus the API page/`has_next_page` note |
+| `data: object` | key/value embed; empty values and empty nested models are dropped |
+| root entity (`Anime`, `Character`, `StackDetail`, …) | title, url, thumbnail, synopsis, then fields in a curated order (`type`, `episodes`, `status`, `score`, `rank`, `members`, …) before the remaining keys |
+| `renderer="debug"` or an unstructured payload | inline fenced JSON up to 1900 chars, `.json` attachment above that |
+
+Navigation over paginated results is **not** part of this step: a paginated
+route renders its current API page and the caller passes `page=` to move. The
+button pagination lands in step 6.
+
+The renderer never raises: an unexpected payload (or a bug in a branch) falls
+back to the JSON path, because a rendering problem must not fail the command.
 
 Item rendering handles both model items and primitives (`*_ids` returns ints,
 `SeasonCalendar` returns season objects).
 
-Discord budgets to respect: description 4096, field value 1024, 25 fields,
-6000 per embed, 2000 per message.
+Discord budgets enforced by the renderer: title 256, description 4096, field
+value 1024, 25 fields, footer 2048, at most 10 embeds per message.
 
 `model_dump()` is used with an `hasattr(obj, "model_dump")` fallback to `.dict()`
 so a pydantic v1 install cannot break rendering.
@@ -394,8 +401,11 @@ mean two per-IP rate limiters.
 ### Step 4 — `feat/jikan-renderers`
 | Commit | Contents |
 |--------|----------|
-| `feat(jikan): render list, object and entity payloads` | `juliabot/jikan_render.py` |
-| `test(jikan): cover renderer branches with a mocked _get` | 5 shape branches + size fallback |
+| `feat(jikan): render list, object and entity payloads` | `juliabot/jikan_render.py`; the dispatcher renders instead of dumping JSON |
+| `test(jikan): cover renderer branches with a mocked _get` | list (paginated, flat, primitives, empty), object, entity, debug JSON, attachment, broken payload, plus one real `AioJikan` call with `_get` mocked |
+
+Step 6 note: `anime_api` is created in step 3, so this step only swaps the
+response path.
 
 ### Step 5 — `feat/jikan-errors-and-limits`
 Commit: `feat(jikan): translate API errors and enforce cooldowns`

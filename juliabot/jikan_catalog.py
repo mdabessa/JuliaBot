@@ -89,8 +89,8 @@ class RouteSpec:
         """Return the parameters that may be filled by position, in order.
 
         Required parameters always qualify; a route's natural search term
-        (``q``/``query``) is appended so ``!search_manga naruto`` works without
-        naming the key.
+        (``q``/``query``) joins them in declaration order, so
+        ``!search_manga naruto`` works without naming the key.
         """
         extra = set(self.positional)
         return tuple(

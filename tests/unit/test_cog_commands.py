@@ -14,6 +14,7 @@ from discord.ext import commands
 
 import juliabot.models as models
 from juliabot.cogs import ai as ai_module
+from juliabot.cogs import anime_api as anime_api_module
 from juliabot.cogs import animes as animes_module
 from juliabot.cogs import changelog as changelog_module
 from juliabot.cogs import core as core_module
@@ -30,6 +31,7 @@ from juliabot.sessions import Registry, Scope, SessionManager
 
 COG_MODULES = [
     ai_module,
+    anime_api_module,
     animes_module,
     changelog_module,
     core_module,

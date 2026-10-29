@@ -148,7 +148,11 @@ command appears automatically. What stays manual, by necessity, is *polish*
 (alias, pt-BR wording, a nicer embed) and *placement* when an entirely new
 resource family appears.
 
-### 3.2 Command generation — `juliabot/cogs/_generated.py` (helper) + per-family cogs
+### 3.2 Command generation — `juliabot/jikan_commands.py` + per-family cogs
+
+The helper lives outside `juliabot/cogs/` on purpose: `Client.setup_hook` loads
+every `juliabot/cogs/*.py` as an extension, so a module there without a `setup`
+entry point would break startup.
 
 For each spec:
 
@@ -156,19 +160,28 @@ For each spec:
 def build_command(cog, spec) -> commands.Command
 ```
 
-- Dispatcher is a closure: `async def _dispatch(ctx, *, raw: str = "")` — one
-  keyword-only rest parameter, so discord.py does no conversion and the whole
-  argument grammar lives in our parser (§3.3). Nothing internal is mutated:
-  no fabricated `inspect.Parameter`, no `exec`. Relies on the supported
-  `*, arg` rest idiom, and on `Command.signature` honoring `usage`.
+- Dispatcher is a closure: `async def _dispatch(command_cog, ctx, *, raw: str = "")`
+  — one keyword-only rest parameter, so discord.py does no conversion and the
+  whole argument grammar lives in our parser (§3.3). Nothing internal is
+  mutated: no fabricated `inspect.Parameter`, no `exec`. Relies on the
+  supported `*, arg` rest idiom, and on `Command.signature` honoring `usage`.
+- The leading `command_cog` parameter is required: `Cog._inject` sets
+  `command.cog`, and discord.py then invokes `callback(cog, ctx, ...)`. The
+  closure's `__qualname__` is set to `"<CogClass>.<command>"` so discord.py
+  skips both leading parameters when inspecting the signature, leaving only
+  `raw` in `command.params`.
 - `usage` is set from `spec.params` so `!help anime_themes` prints
   `anime_themes <anime_id> [sfw=bool] [sfw_strict=bool]`.
 - `brief` / `description` / `aliases` from the spec; `extras={"route": spec.route}`
   so the passthrough and error messages can round-trip.
-- `commands.cooldown(*spec.cooldown, commands.BucketType.user)`.
+- `commands.cooldown(*spec.cooldown, commands.BucketType.user)` is applied to the
+  callback before constructing the command, which is where `Command.__init__`
+  reads it from.
+- Parsing failures are caught inside the dispatcher and answered with the
+  `JikanArgumentError` message, so `error_handler.py` needs no new branch.
 - Registration in `__init__`:
   ```python
-  generated = build_commands(self, load_specs(), group="anime")
+  generated = build_commands(self, load_specs(), allowlist=ROUTES_ALLOWLIST)
   self.__cog_commands__ = (*self.__cog_commands__, *generated)
   ```
   **Before** extending, each name/alias is checked against
@@ -364,12 +377,19 @@ commands in step 3 catch it and answer with the message, so
 ### Step 3 — `feat/jikan-command-generator`
 | Commit | Contents |
 |--------|----------|
-| `feat(jikan): generate commands from the route catalog` | `juliabot/cogs/_generated.py` (`build_command`, collision guard) |
-| `test(jikan): register generated commands with help metadata` | one route end-to-end (`anime_themes`) via `ROUTES_ALLOWLIST` |
+| `feat(jikan): generate commands from the route catalog` | `juliabot/jikan_commands.py` (`build_command(s)`, collision guard) and `juliabot/cogs/anime_api.py` with `ROUTES_ALLOWLIST = {"get_anime_themes"}` |
+| `test(jikan): register generated commands with help metadata` | `tests/unit/test_jikan_commands.py`; new cog added to the cog smoke and drift lists |
 
 Tests: command registered on the cog; `brief`/`description`/`aliases`/`usage`
-populated; appears in `cog.walk_commands()`; a name clash is skipped without
-raising; works against a fake client exposing 3 methods only.
+populated; `command.params` holds only the rest parameter; dispatcher calls the
+route with parsed kwargs; argument errors answer without calling the API; name
+clashes (existing command or duplicate in the batch) are skipped without
+raising; oversized payloads are split under the 2000-char limit; a real
+`commands.Bot` registers the command and survives a reload.
+
+Also in this step, `AnimesCog` reuses `bot.jikan` instead of always creating a
+client, because `anime_api` loads first (alphabetically) and two clients would
+mean two per-IP rate limiters.
 
 ### Step 4 — `feat/jikan-renderers`
 | Commit | Contents |

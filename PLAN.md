@@ -88,13 +88,15 @@ later (introspection → `jikan4.spec`) without touching consumers.
 class RouteSpec:
     route: str                  # AioJikan method name
     name: str                   # command name
-    group: str                  # "anime" | "manga" | "character" | "catalog" | ...
+    group: str                  # "anime" | "manga" | "catalog"
     brief: str
     description: str
     params: tuple[ParamSpec, ...]
+    positional: tuple[str, ...] = ()   # derived: "q"/"query"
     aliases: tuple[str, ...] = ()
     hidden: bool = False
-    renderer: str = "auto"      # "auto" | "embed" | "list" | "debug"
+    curated: bool = False       # hand-written command already covers it
+    renderer: str = "auto"      # "auto" | "embed" | "debug"
     cooldown: tuple[int, int] = (1, 5)
 
 @dataclass(frozen=True)
@@ -127,13 +129,17 @@ def load_specs() -> tuple[RouteSpec, ...]: ...
 |-------|--------|
 | `get_anime` | name `anime_info` (free the `anime` alias, which belongs to `search_anime`) |
 | `get_manga` | name `manga_info` (symmetry with `anime_info`) |
-| `search_manga` | default `search_type="manga"` so `!search_manga naruto` works |
+| `search_anime` | `curated=True` — the hand-written command in the animes cog owns it |
 | `get_anime_deleted`, `get_anime_unapproved`, `get_anime_denied` | `hidden=True` |
 | `get_manga_deleted`, `get_manga_unapproved`, `get_manga_denied` | `hidden=True` |
 | `get_anime_ids`, `get_manga_ids`, `get_character_ids`, `get_person_ids`, `get_producer_ids` | `hidden=True`, `renderer="debug"` (bulk dumps) |
 | `get_random_anime`, `get_random_manga`, `get_random_character`, `get_random_person` | `renderer="embed"` |
 | `get_anime_themes`, `get_anime_videos`, `get_anime_statistics`, `get_anime_moreinfo`, `get_manga_moreinfo`, `get_manga_statistics` | `renderer="embed"` |
-| `anime_info`, `seasons_now`, `schedules`, `top_anime`, `random_anime`, `characters` | short aliases (`ani`, `now`, `sched`, `ta`, `ra`, `chars`) |
+| `get_anime`, `get_seasons_now`, `get_schedules`, `get_top_anime`, `get_random_anime`, `get_characters` | short aliases (`ani`, `now`, `sched`, `ta`, `ra`, `chars`) |
+
+The positional search term is derived, not policy: a route's `q`/`query`
+parameter joins the required parameters as a positional, so `!search_manga
+naruto` and `!characters luffy` work without naming the key.
 
 Everything else keeps the derived name, no alias, `auto` renderer.
 
@@ -182,8 +188,9 @@ Rules:
 
 1. Tokenize `raw` on whitespace, honoring `"quoted values"` (needed for
    `q="full metal"`).
-2. Tokens without `=` fill **required** params in declaration order; extras are
-   an error (never silently dropped).
+2. Tokens without `=` fill `spec.positional_names` in declaration order (the
+   required parameters, plus the route's `q`/`query` search term); extras are an
+   error (never silently dropped).
 3. Tokens with `=` must match a declared param of the route; unknown key →
    error listing the valid keys.
 4. Coerce by `ParamSpec.annotation`: `int`, `float`, `bool`
@@ -323,10 +330,15 @@ Commit: `docs: add plan for generated Jikan commands (#5)`
 
 Tests:
 - one spec per public `AioJikan` coroutine (excluding `close`);
-- `spec.route` resolves to a callable on the client;
+- `spec.route` resolves to a coroutine on the client;
 - names and aliases are unique across the catalog;
 - every `POLICY` key resolves to a real route (**stale-policy guard**);
-- `get_anime` does not produce the name/alias `anime`.
+- `get_anime` does not produce the name/alias `anime`;
+- `search_anime` is flagged `curated` so the generator skips it;
+- hidden routes match the policy, bulk dumps use the debug renderer;
+- parameters use only supported types and required ones precede optional ones;
+- `positional_names` / `usage` render the search term and `key=value` params;
+- duplicate labels, stale policy and unknown renderers raise.
 
 Nothing is registered → zero behaviour change, safe to land first.
 

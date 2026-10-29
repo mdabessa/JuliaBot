@@ -9,65 +9,38 @@ tested place.
 
 from __future__ import annotations
 
-import json
 import logging
-from typing import Any, Iterable
+from typing import Iterable
 
 from discord.ext import commands
 
 from .jikan_args import JikanArgumentError, parse_arguments
 from .jikan_catalog import RouteSpec
+from .jikan_render import RenderResult, render
 
 logger = logging.getLogger(__name__)
 
-MAX_MESSAGE_LENGTH = 2000
 
-
-def _dump_payload(payload: Any) -> str:
-    """Serialize a route payload as JSON, tolerating pydantic v1 and v2."""
-    if hasattr(payload, "model_dump"):
-        payload = payload.model_dump()
-    elif hasattr(payload, "dict"):
-        payload = payload.dict()
-    return json.dumps(payload, ensure_ascii=False, indent=2, default=str)
-
-
-def _split_message(text: str, limit: int = MAX_MESSAGE_LENGTH) -> list[str]:
-    """Split a long text into messages without cutting lines needlessly."""
-    chunks: list[str] = []
-    current = ""
-    for line in text.splitlines(keepends=True):
-        while len(line) > limit:
-            if current:
-                chunks.append(current)
-                current = ""
-            chunks.append(line[:limit])
-            line = line[limit:]
-        if len(current) + len(line) > limit:
-            chunks.append(current)
-            current = line
-        else:
-            current += line
-    if current:
-        chunks.append(current)
-    return chunks
-
-
-async def send_raw_payload(ctx: commands.Context, payload: Any) -> None:
-    """Send the payload as a fenced JSON block.
-
-    This is the debug rendering path; the generic renderers replace it for the
-    routes that have a nicer presentation.
-    """
-    body = f"```json\n{_dump_payload(payload)}\n```"
-    for chunk in _split_message(body):
-        await ctx.send(chunk)
+async def send_rendered(ctx: commands.Context, result: RenderResult) -> None:
+    """Send one rendered result as a single Discord message."""
+    if result.file is not None:
+        await ctx.send(content=result.content, file=result.file)
+        return
+    if result.embeds:
+        await ctx.send(content=result.content, embeds=list(result.embeds))
+        return
+    if result.content is not None:
+        await ctx.send(content=result.content)
 
 
 def resolve_client(cog: commands.Cog):
     """Return the Jikan client shared through the bot, if one exists."""
     bot = getattr(cog, "bot", None)
     return getattr(bot, "jikan", None) or getattr(cog, "jikan", None)
+
+
+def _color_of(cog: commands.Cog) -> int:
+    return getattr(getattr(cog, "bot", None), "color", 0)
 
 
 def build_command(cog: commands.Cog, spec: RouteSpec) -> commands.Command:
@@ -86,7 +59,7 @@ def build_command(cog: commands.Cog, spec: RouteSpec) -> commands.Command:
             return
 
         payload = await getattr(client, spec.route)(**kwargs)
-        await send_raw_payload(ctx, payload)
+        await send_rendered(ctx, render(payload, spec, _color_of(command_cog)))
 
     _dispatch.__name__ = spec.name
     # A cog command is invoked as ``callback(cog, ctx, ...)``; the qualified

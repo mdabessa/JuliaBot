@@ -104,6 +104,37 @@ def test_groups_cover_the_whole_catalog(specs):
     assert sum(1 for spec in specs if spec.group == catalog.GROUP_MANGA) == 18
 
 
+@pytest.mark.parametrize(
+    ("route", "shape"),
+    [
+        ("get_anime", catalog.SHAPE_ENTITY),
+        ("search_anime", catalog.SHAPE_PAGINATED),
+        ("get_anime_themes", catalog.SHAPE_OBJECT),
+        ("get_anime_external", catalog.SHAPE_LIST),
+        ("get_seasons", catalog.SHAPE_LIST),
+        ("get_characters", catalog.SHAPE_PAGINATED),
+    ],
+)
+def test_response_shape_is_derived_from_the_model(specs, route, shape):
+    spec = next(spec for spec in specs if spec.route == route)
+
+    assert spec.shape == shape
+
+
+def test_every_route_has_a_known_shape(specs):
+    shapes = {spec.shape for spec in specs}
+
+    assert catalog.SHAPE_UNKNOWN not in shapes
+    assert shapes == {
+        catalog.SHAPE_PAGINATED,
+        catalog.SHAPE_LIST,
+        catalog.SHAPE_OBJECT,
+        catalog.SHAPE_ENTITY,
+    }
+    paginated = sum(1 for spec in specs if spec.shape == catalog.SHAPE_PAGINATED)
+    assert paginated == 49
+
+
 def test_params_are_typed_with_supported_annotations(specs):
     annotations = {param.annotation for spec in specs for param in spec.params}
 

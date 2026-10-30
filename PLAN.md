@@ -313,7 +313,7 @@ Routes whose response model is `data: list` + `pagination` (49 of them, derived
 as `RouteSpec.shape`) get a `JikanRoutePagination`, registered once as
 `jikan.page`:
 
-- one embed per result with `◀ ▶` buttons, footer `route • i/N`;
+- one embed per result with `Anterior`/`Próximo` buttons, footer `route • i/N`;
 - `next` walks the loaded page, then fetches the adjacent API page at the
   boundary (`has_next` gate, `page=` preserved from the command);
 - payload `{route, kwargs, api_page, index, has_next}` is JSON-safe and

@@ -14,6 +14,7 @@ from discord.ext import commands
 
 import juliabot.models as models
 from juliabot.cogs import ai as ai_module
+from juliabot.cogs import anime_api as anime_api_module
 from juliabot.cogs import animes as animes_module
 from juliabot.cogs import changelog as changelog_module
 from juliabot.cogs import core as core_module
@@ -22,6 +23,9 @@ from juliabot.cogs import error_handler as error_handler_module
 from juliabot.cogs import fun as fun_module
 from juliabot.cogs import game as game_module
 from juliabot.cogs import help as help_module
+from juliabot.cogs import jikan as jikan_module
+from juliabot.cogs import mal as mal_module
+from juliabot.cogs import manga as manga_module
 from juliabot.cogs import reminder as reminder_module
 from juliabot.cogs import server_config as server_config_module
 from juliabot.cogs import twitch as twitch_module
@@ -30,6 +34,7 @@ from juliabot.sessions import Registry, Scope, SessionManager
 
 COG_MODULES = [
     ai_module,
+    anime_api_module,
     animes_module,
     changelog_module,
     core_module,
@@ -38,6 +43,9 @@ COG_MODULES = [
     fun_module,
     game_module,
     help_module,
+    jikan_module,
+    mal_module,
+    manga_module,
     reminder_module,
     server_config_module,
     twitch_module,
@@ -80,6 +88,7 @@ class FakeSentMessage:
         self.file = file
         self.channel = channel
         self.view = view
+        self.embeds: list[object] = [embed] if embed is not None else []
         self.edits: list[dict[str, object]] = []
         self.deleted = False
         self.reactions: list[str] = []
@@ -141,7 +150,7 @@ class FakeChannel:
         self.sent_messages: list[FakeSentMessage] = []
         self.history_messages: list[object] = []
 
-    async def send(self, content=None, embed=None, file=None, view=None):
+    async def send(self, content=None, embed=None, file=None, view=None, embeds=None):
         message = FakeSentMessage(
             content=content,
             embed=embed,
@@ -149,6 +158,8 @@ class FakeChannel:
             channel=self,
             view=view,
         )
+        if embeds:
+            message.embeds = list(embeds)
         self.sent_messages.append(message)
         return message
 
@@ -251,14 +262,14 @@ class FakeContext:
             mentions=mentions,
         )
 
-    async def send(self, content=None, embed=None, file=None, view=None):
+    async def send(self, content=None, embed=None, file=None, view=None, embeds=None):
         return await self.channel.send(
-            content=content, embed=embed, file=file, view=view
+            content=content, embed=embed, file=file, view=view, embeds=embeds
         )
 
-    async def reply(self, content=None, embed=None, file=None, view=None):
+    async def reply(self, content=None, embed=None, file=None, view=None, embeds=None):
         message = await self.channel.send(
-            content=content, embed=embed, file=file, view=view
+            content=content, embed=embed, file=file, view=view, embeds=embeds
         )
         self.reply_messages.append(message)
         return message
@@ -1155,6 +1166,28 @@ async def _run_utilities_channel_history(
     ), "utilities::channel_history should send the generated transcript file"
 
 
+async def _run_jikan_passthrough(
+    monkeypatch: pytest.MonkeyPatch, _tmp_path: Path
+) -> None:
+    bot, ctx = _make_ctx(content="!jikan get_anime_themes 1")
+    cog = jikan_module.JikanCog(bot)
+    ctx.cog = cog
+
+    async def fake_get_anime_themes(**kwargs):
+        assert kwargs == {"anime_id": 1}
+        return {"data": {"openings": ["OP1"]}}
+
+    monkeypatch.setattr(cog.jikan, "get_anime_themes", fake_get_anime_themes)
+
+    await jikan_module.JikanCog.jikan_command.callback(
+        cog, ctx, argument="get_anime_themes 1"
+    )
+
+    assert (
+        ctx.channel.sent_messages[-1].embeds[0].fields[0].value == "OP1"
+    ), "jikan::jikan should render the payload of the requested route"
+
+
 COMMAND_CASES = [
     CommandCase("ai", "ask", _run_ai_ask),
     CommandCase("ai", "breakpoint", _run_ai_breakpoint),
@@ -1185,6 +1218,7 @@ COMMAND_CASES = [
     CommandCase("game", "play", _run_game_play),
     CommandCase("game", "endgame", _run_game_endgame),
     CommandCase("help", "help", _run_help_help),
+    CommandCase("jikan", "jikan", _run_jikan_passthrough),
     CommandCase("reminder", "list_reminders", _run_reminder_list),
     CommandCase("reminder", "remind_me", _run_reminder_remind_me),
     CommandCase("reminder", "remind_me_loop", _run_reminder_remind_me_loop),

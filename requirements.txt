@@ -4,7 +4,7 @@ environs==9.3.*
 psycopg2-binary==2.9.*
 SQLAlchemy==1.4.*
 beautifulsoup4==4.9.*
-jikan4
+jikan4>=1.0,<2.0
 deep-translator==1.9.*
 python-dateutil==2.8.*
 heroku3==5.2.*

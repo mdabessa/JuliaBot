@@ -13,11 +13,15 @@ import logging
 from typing import Iterable
 
 from discord.ext import commands
+from jikan4 import AioJikan
 
+from .config import BOT_JIKAN_RATE_LIMIT
 from .jikan_args import JikanArgumentError, parse_arguments
-from .jikan_catalog import RouteSpec
+from .jikan_catalog import RENDERER_DEBUG, SHAPE_PAGINATED, RouteSpec, load_specs
 from .jikan_errors import JikanCallError, call_route
-from .jikan_render import RenderResult, render
+from .jikan_render import EMPTY_MESSAGE, RenderResult, render
+from .jikan_sessions import JIKAN_PAGE, register
+from .sessions import InteractionEvent, Registry, SessionManager, TriggerType
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +48,53 @@ def _color_of(cog: commands.Cog) -> int:
     return getattr(getattr(cog, "bot", None), "color", 0)
 
 
+def _session_event(ctx: commands.Context) -> InteractionEvent:
+    """Build a normalized interaction event from a command invocation."""
+    return InteractionEvent(
+        transport=TriggerType.COMPONENT,
+        key=str(ctx.message.id),
+        user_id=ctx.author.id,
+        guild_id=getattr(ctx.guild, "id", None),
+        channel_id=ctx.channel.id,
+        message_id=ctx.message.id,
+        raw=ctx,
+    )
+
+
+async def _start_pagination(
+    cog: commands.Cog, ctx: commands.Context, spec: RouteSpec, kwargs: dict
+) -> bool:
+    """Start the button session for a paginated route.
+
+    Return ``False`` when the bot has no session manager, so the caller can
+    fall back to the static rendering.
+    """
+    manager = getattr(getattr(cog, "bot", None), "sessions", None)
+    if manager is None:
+        return False
+
+    register(manager)
+    page = kwargs.get("page")
+    session = await manager.start(
+        JIKAN_PAGE,
+        _session_event(ctx),
+        payload={
+            "route": spec.route,
+            "kwargs": kwargs,
+            "api_page": page if isinstance(page, int) and page > 0 else 1,
+            "index": 0,
+            "has_next": False,
+        },
+    )
+    if session.closed:
+        await ctx.send(EMPTY_MESSAGE)
+    return True
+
+
 def build_command(cog: commands.Cog, spec: RouteSpec) -> commands.Command:
     """Build the command that exposes one route."""
+
+    paginated = spec.shape == SHAPE_PAGINATED and spec.renderer != RENDERER_DEBUG
 
     async def _dispatch(command_cog, ctx: commands.Context, *, raw: str = "") -> None:
         try:
@@ -58,6 +107,15 @@ def build_command(cog: commands.Cog, spec: RouteSpec) -> commands.Command:
         if client is None:
             await ctx.send("O cliente da API de animes não está disponível.")
             return
+
+        if paginated:
+            try:
+                handled = await _start_pagination(command_cog, ctx, spec, kwargs)
+            except JikanCallError as exc:
+                await ctx.send(str(exc))
+                return
+            if handled:
+                return
 
         try:
             payload = await call_route(client, spec, kwargs)
@@ -101,7 +159,6 @@ def _conflict(command: commands.Command, cog: commands.Cog, taken: set[str]):
 def build_commands(
     cog: commands.Cog,
     specs: Iterable[RouteSpec],
-    allowlist: Iterable[str] | None = None,
 ) -> tuple[commands.Command, ...]:
     """Build the commands of ``specs``, skipping curated and colliding routes.
 
@@ -109,14 +166,11 @@ def build_commands(
     back the whole cog when a registration fails, so one bad alias must never
     take the other commands down with it.
     """
-    allowed = None if allowlist is None else set(allowlist)
     taken: set[str] = set()
     built: list[commands.Command] = []
 
     for spec in specs:
         if spec.curated:
-            continue
-        if allowed is not None and spec.route not in allowed:
             continue
 
         command = build_command(cog, spec)
@@ -129,3 +183,33 @@ def build_commands(
         built.append(command)
 
     return tuple(built)
+
+
+class GeneratedRoutesCog(commands.Cog):
+    """Expose every generated route of one catalog group as commands.
+
+    Subclasses only declare ``route_group`` and ``embed_title``; the command
+    list, the shared client and the pagination registration are handled here.
+    """
+
+    route_group: str = ""
+    embed_title: str = ""
+
+    def __init__(self, bot) -> None:
+        self.bot = bot
+        # Cog load order is alphabetical, so any of the generated cogs may run
+        # first; reusing the client keeps a single per-IP rate limiter.
+        self.jikan = getattr(bot, "jikan", None) or AioJikan(
+            rate_limit=BOT_JIKAN_RATE_LIMIT
+        )
+        bot.jikan = self.jikan
+
+        if not hasattr(bot, "sessions"):
+            bot.sessions = SessionManager(Registry())
+        register(bot.sessions)
+
+        generated = build_commands(
+            self,
+            (spec for spec in load_specs() if spec.group == self.route_group),
+        )
+        self.__cog_commands__ = (*self.__cog_commands__, *generated)

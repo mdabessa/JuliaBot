@@ -290,17 +290,39 @@ Rate limits:
 | `manga` *(new)* | `Mangás.` | generated `get_manga_*` + `search_manga` | 18 |
 | `mal` *(new)* | `MyAnimeList.` | characters, people, persons, producers, seasons, schedules, top, genres, magazines, articles, news, reviews, recommendations, random, stacks | 53 |
 
-`mal` holds ~53 tokens (~1.1k chars) → the existing `_cog_fields` splitter emits
-two continuation fields and `_chunk_cogs` gives it its own help page, which is
-already handled. `hidden=True` routes are excluded from the listing, so the
-visible count is lower.
+`mal` holds 53 commands and lands on its own help page (`_chunk_cogs` splits it);
+`hidden=True` routes are excluded from the listing, so the visible count is
+lower. Measured with all three generated cogs loaded: page 1 = `anime_api` +
+`animes` + `manga` (753 chars), page 2 = `mal` (804 chars).
 
 Rationale for four cogs rather than one: a single cog with 96 tokens produces an
 unreadable wall, and `_chunk_cogs` would give it a page of its own while the
 other cogs' pages shrink. Four cogs keeps `!help` at ~2–3 pages and mirrors how
 people look things up.
 
-### 3.7 Passthrough — `!jikan`
+All three generated cogs subclass `GeneratedRoutesCog` (`juliabot/jikan_commands.py`),
+which owns the shared client, the session registration and the command list; each
+cog file is only a `route_group` + `embed_title` pair. Measured on a real
+`commands.Bot`: 25 + 18 + 53 = 96 generated commands, zero skipped, zero
+unreachable by name, and `!help` fits in 2 pages with `mal` alone on the second.
+
+### 3.7 Pagination — `juliabot/jikan_sessions.py`
+
+Routes whose response model is `data: list` + `pagination` (49 of them, derived
+as `RouteSpec.shape`) get a `JikanRoutePagination`, registered once as
+`jikan.page`:
+
+- one embed per result with `◀ ▶` buttons, footer `route • i/N`;
+- `next` walks the loaded page, then fetches the adjacent API page at the
+  boundary (`has_next` gate, `page=` preserved from the command);
+- payload `{route, kwargs, api_page, index, has_next}` is JSON-safe and
+  `resumable=True`, so buttons survive a restart and rehydrate the client;
+- `renderer="debug"` routes (`*_ids`) stay static — a session over thousands of
+  ids is useless;
+- if the bot has no session manager (unit tests, embedding), the dispatcher
+  falls back to the static renderer instead of failing.
+
+### 3.8 Passthrough — `!jikan`
 
 Kept, and public:
 
@@ -314,7 +336,7 @@ This is what makes "zero bot changes" literally true even for a route the
 generator skipped due to a name collision, and it is the debugging hatch when an
 upstream route returns an unexpected shape.
 
-### 3.8 What is automatic vs. what needs a human
+### 3.9 What is automatic vs. what needs a human
 
 | Upstream change | Bot action needed |
 |-----------------|-------------------|
@@ -433,12 +455,17 @@ actually raises and that the header is readable.
 ### Step 6 — `feat/jikan-api-cogs`
 | Commit | Contents |
 |--------|----------|
-| `feat(jikan): add generated anime API cog` | `juliabot/cogs/anime_api.py` |
-| `feat(jikan): add generated manga cog` | `juliabot/cogs/manga.py` |
-| `feat(jikan): add generated MAL catalog cog` | `juliabot/cogs/mal.py`; `ROUTES_ALLOWLIST` emptied |
+| `feat(jikan): expose every anime route in the API cog` | `juliabot/jikan_commands.py`: `GeneratedRoutesCog` base; `juliabot/cogs/anime_api.py` becomes a 3-line subclass; `build_commands` loses the allowlist |
+| `feat(jikan): paginate generated routes with buttons` | `juliabot/jikan_sessions.py` (`JikanRoutePagination`, `jikan.page` registration); `RouteSpec.shape` derived from the response model; `jikan_render.item_embed` |
+| `feat(jikan): add manga and MAL catalogue cogs` | `juliabot/cogs/manga.py`, `juliabot/cogs/mal.py`; both added to the cog smoke and drift lists |
 
-Includes `GenericRoutePagination` (`resumable=True`, rebinds `bot.jikan` on
-`hydrate` like `_bind_runtime`) and the help-page sanity assertions.
+Verified on a real `commands.Bot`: 96 generated commands (25 + 18 + 53), zero
+skipped by the collision guard, every route reachable by name, 11 hidden routes
+registered but absent from `!help`, one shared client across the cogs, one
+`jikan.page` registration, and `!help` in 2 pages within the embed budget.
+
+`ROUTES_ALLOWLIST` is gone rather than emptied: it only existed to stage the
+rollout, and keeping it would be config nobody exercises.
 
 ### Step 7 — `feat/jikan-passthrough`
 Commit: `feat(jikan): add !jikan passthrough with list and schema`

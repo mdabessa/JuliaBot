@@ -28,6 +28,12 @@ GROUP_ANIME = "anime"
 GROUP_MANGA = "manga"
 GROUP_CATALOG = "catalog"
 
+SHAPE_PAGINATED = "paginated"
+SHAPE_LIST = "list"
+SHAPE_OBJECT = "object"
+SHAPE_ENTITY = "entity"
+SHAPE_UNKNOWN = "unknown"
+
 RENDERER_AUTO = "auto"
 RENDERER_EMBED = "embed"
 RENDERER_DEBUG = "debug"
@@ -78,6 +84,7 @@ class RouteSpec:
     curated: bool = False
     renderer: str = RENDERER_AUTO
     cooldown: tuple[int, int] = (1, 5)
+    shape: str = SHAPE_UNKNOWN
 
     @property
     def required_params(self) -> tuple[ParamSpec, ...]:
@@ -307,6 +314,20 @@ def _positional_names(params: Iterable[ParamSpec]) -> tuple[str, ...]:
     )
 
 
+def _shape_of(model: Any) -> str:
+    """Classify the response model of a route by its ``data`` field."""
+    fields = getattr(model, "model_fields", None)
+    if not isinstance(fields, dict):
+        return SHAPE_UNKNOWN
+
+    data = fields.get("data")
+    if data is None:
+        return SHAPE_ENTITY
+    if typing.get_origin(data.annotation) is list:
+        return SHAPE_PAGINATED if "pagination" in fields else SHAPE_LIST
+    return SHAPE_OBJECT
+
+
 def route_names(client: type = AioJikan) -> tuple[str, ...]:
     """Return the public API routes of the client, sorted by name."""
     names: list[str] = []
@@ -337,6 +358,7 @@ def _build_spec(route: str) -> RouteSpec:
         description=description or brief or _command_name(route),
         params=tuple(params),
         positional=_positional_names(params),
+        shape=_shape_of(hints.get("return")),
     )
 
 

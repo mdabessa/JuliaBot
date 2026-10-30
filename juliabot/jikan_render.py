@@ -75,6 +75,9 @@ def _dump(payload: Any) -> Any:
     return payload
 
 
+safe_dump = _dump
+
+
 def _safe_dump(payload: Any) -> Any:
     """Serialize a payload without ever raising."""
     try:
@@ -297,6 +300,44 @@ def _json_result(payload: Any, spec: RouteSpec) -> RenderResult:
     stream = io.BytesIO(text.encode("utf-8"))
     stream.seek(0)
     return RenderResult(file=File(stream, filename=f"{spec.name}.json"))
+
+
+def item_embed(
+    item: Any, spec: RouteSpec, color: int = 0, position: int = 0, total: int = 1
+) -> Embed:
+    """Render one list entry as its own embed, used by paginated sessions."""
+    data = _safe_dump(item)
+    if not isinstance(data, dict):
+        embed = Embed(
+            title=_title(spec),
+            description=_clip(str(data), MAX_DESCRIPTION),
+            color=color,
+        )
+        embed.set_footer(
+            text=_clip(f"{spec.name} • {position + 1}/{total}", MAX_FOOTER)
+        )
+        return embed
+
+    title = data.get("title") or data.get("name") or data.get("mal_id") or _title(spec)
+    embed = Embed(title=_clip(str(title), MAX_TITLE), color=color)
+
+    url = data.get("url")
+    if _is_url(url):
+        embed.url = url
+
+    image = _image_url(data)
+    if image is not None:
+        embed.set_thumbnail(url=image)
+
+    description = (
+        data.get("synopsis") or data.get("description") or data.get("moreinfo")
+    )
+    if isinstance(description, str) and description.strip():
+        embed.description = _clip(description.strip(), MAX_DESCRIPTION)
+
+    _add_entity_fields(embed, data)
+    embed.set_footer(text=_clip(f"{spec.name} • {position + 1}/{total}", MAX_FOOTER))
+    return embed
 
 
 def render(payload: Any, spec: RouteSpec, color: int = 0) -> RenderResult:

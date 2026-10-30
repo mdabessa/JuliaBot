@@ -23,6 +23,8 @@ from juliabot.cogs import error_handler as error_handler_module
 from juliabot.cogs import fun as fun_module
 from juliabot.cogs import game as game_module
 from juliabot.cogs import help as help_module
+from juliabot.cogs import mal as mal_module
+from juliabot.cogs import manga as manga_module
 from juliabot.cogs import reminder as reminder_module
 from juliabot.cogs import server_config as server_config_module
 from juliabot.cogs import twitch as twitch_module
@@ -40,6 +42,8 @@ COG_MODULES = [
     fun_module,
     game_module,
     help_module,
+    mal_module,
+    manga_module,
     reminder_module,
     server_config_module,
     twitch_module,

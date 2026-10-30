@@ -111,6 +111,8 @@ class JikanRoutePagination(PaginationSession[Any]):
         if context is None:
             raise RuntimeError("Jikan pagination requires an invoking context")
         _bind_runtime(self, context)
+        if self._jikan is None:
+            raise JikanCallError("O cliente da API de animes não está disponível.")
         await super().start(event)
 
     async def hydrate(self, event: InteractionEvent | None = None) -> None:

@@ -13,6 +13,7 @@ COGS = [
     "juliabot.cogs.fun",
     "juliabot.cogs.game",
     "juliabot.cogs.help",
+    "juliabot.cogs.jikan",
     "juliabot.cogs.mal",
     "juliabot.cogs.manga",
     "juliabot.cogs.reminder",

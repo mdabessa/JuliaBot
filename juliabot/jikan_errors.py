@@ -18,6 +18,11 @@ from .jikan_catalog import RouteSpec
 
 logger = logging.getLogger(__name__)
 
+try:  # pydantic ships with jikan4, but the error type stays optional here
+    from pydantic import ValidationError as PydanticValidationError
+except ImportError:  # pragma: no cover - defensive
+    PydanticValidationError = ()  # type: ignore[assignment,misc]
+
 DEFAULT_RETRY_AFTER = 30.0
 MAX_RETRY_AFTER = 300.0
 
@@ -98,6 +103,11 @@ def translate(error: BaseException, *, retry_remaining: float = 0.0) -> JikanCal
     if isinstance(error, aiohttp.ContentTypeError):
         return JikanCallError("A API respondeu em um formato inesperado.")
 
+    # The client parses the response into a pydantic model inside the route
+    # call, so a changed API shape surfaces as a validation error.
+    if PydanticValidationError and isinstance(error, PydanticValidationError):
+        return JikanCallError("A API respondeu em um formato inesperado.")
+
     if isinstance(error, aiohttp.ClientResponseError):
         retry_after = _retry_after(error) if error.status == 429 else 0.0
         retry_after = max(retry_after, retry_remaining)
@@ -127,7 +137,11 @@ async def call_route(
 
     try:
         return await getattr(client, spec.route)(**kwargs)
-    except (asyncio.TimeoutError, aiohttp.ClientError) as error:
+    except (
+        asyncio.TimeoutError,
+        aiohttp.ClientError,
+        PydanticValidationError,
+    ) as error:
         if _is_rate_limited(error):
             retry_after = _retry_after(error)
             guard.block(retry_after)

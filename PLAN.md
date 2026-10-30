@@ -262,6 +262,7 @@ so a pydantic v1 install cannot break rendering.
 | 5xx | `A API do MyAnimeList está instável agora. Tente novamente em instantes.` |
 | other 4xx | `A API respondeu com erro {status}.` |
 | `aiohttp.ContentTypeError` | `A API respondeu em um formato inesperado.` |
+| `pydantic.ValidationError` | `A API respondeu em um formato inesperado.` |
 | `asyncio.TimeoutError` | `A consulta demorou demais e foi cancelada.` |
 | `aiohttp.ClientError` | `Não consegui falar com a API do MyAnimeList.` |
 | anything else | `Não foi possível concluir a consulta.` |
@@ -322,19 +323,30 @@ as `RouteSpec.shape`) get a `JikanRoutePagination`, registered once as
 - if the bot has no session manager (unit tests, embedding), the dispatcher
   falls back to the static renderer instead of failing.
 
-### 3.8 Passthrough — `!jikan`
+### 3.8 Passthrough — `juliabot/cogs/jikan.py`
 
-Kept, and public:
+`!jikan` (alias `api`), public, 1/5s per user:
 
-- `!jikan <route> [k=v ...]` — resolve `route` against `load_specs()`; if the
-  route is unknown, suggest the closest names.
-- `!jikan --list [family]` — paginated list of routes + `brief`.
-- `!jikan --schema <route>` — parameters, types, defaults, docstring.
-- Hidden routes are reachable here, but only for the bot owner.
+- `!jikan <route> [k=v ...]` — the route name may omit the `get_` prefix; the
+  tail goes through the same parser and the same `execute_route` path as the
+  generated commands, so pagination and error handling behave identically.
+  An unknown route answers with `difflib` suggestions.
+- `!jikan --list [anime|manga|catalog]` (or `-l`) — one embed per group with
+  `name — brief`, split at the 4096-char description limit; the page suffix only
+  appears when a group needs more than one embed.
+- `!jikan --schema <route>` (or `-s`) — the docstring summary, the backing
+  Python call, the response shape, and one field per parameter with its type,
+  whether it is required, and its default.
+- `!jikan` with no arguments prints the usage and points at
+  `!help !anime_api`, `!help !manga` and `!help !mal`.
 
-This is what makes "zero bot changes" literally true even for a route the
-generator skipped due to a name collision, and it is the debugging hatch when an
-upstream route returns an unexpected shape.
+Hidden routes (`*_deleted`, `*_unapproved`, `*_denied`, `*_ids`) answer
+"Rota desconhecida" to everyone except the bot owner, and are absent from
+`--list` for non-owners — no need to advertise crawlable endpoints.
+
+`execute_route` lives in `juliabot/jikan_commands.py` and is shared with the
+generated commands; before this step the logic was trapped inside the command
+closure.
 
 ### 3.9 What is automatic vs. what needs a human
 
@@ -468,8 +480,15 @@ registered but absent from `!help`, one shared client across the cogs, one
 rollout, and keeping it would be config nobody exercises.
 
 ### Step 7 — `feat/jikan-passthrough`
-Commit: `feat(jikan): add !jikan passthrough with list and schema`
-— `!jikan <route> [k=v]`, `--list`, `--schema`, owner-only hidden routes.
+| Commit | Contents |
+|--------|----------|
+| `refactor(jikan): share the route execution path` | `execute_route` extracted from the command closure into `juliabot/jikan_commands.py` |
+| `feat(jikan): add the !jikan passthrough command` | `juliabot/cogs/jikan.py` (`!jikan`, `--list`, `--schema`, owner-only hidden routes) + coverage in `tests/unit/test_jikan_passthrough.py` and the drift list |
+| `fix(jikan): report unparseable responses instead of raising` | `pydantic.ValidationError` translated to the "formato inesperado" message |
+
+Verified against a local `aiohttp` server through a real `commands.Bot`: route
+call, paginated session payload, hidden route blocked then allowed for the
+owner, `--list` grouping, `--schema` fields, and a typo suggestion.
 
 ### Step 8 — `docs/jikan-commands`
 Commit: `docs: document generated Jikan commands`

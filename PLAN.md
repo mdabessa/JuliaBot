@@ -250,23 +250,36 @@ so a pydantic v1 install cannot break rendering.
 
 ### 3.5 Errors and rate limiting — `juliabot/jikan_errors.py`
 
-`call_route(client, spec, kwargs)` wraps the coroutine and translates:
+`call_route(client, spec, kwargs, *, guard=None)` wraps the coroutine and raises
+`JikanCallError`, whose message is written straight to the channel:
 
 | Exception | Message |
 |-----------|---------|
-| `aiohttp.ClientResponseError` 404 | `Não encontrei nada com esse id/critério.` |
-| 429 | `A API do MyAnimeList está limitando as requisições. Tente em Xs.` |
-| 5xx | `A API do MyAnimeList está instável agora.` |
+| 400 | `A API recusou os parâmetros dessa consulta.` |
+| 401 / 403 | `A API bloqueou essa consulta.` |
+| 404 | `Não encontrei nada com esse id ou critério.` |
+| 429 | `A API do MyAnimeList está limitando as requisições. Tente novamente em Xs.` |
+| 5xx | `A API do MyAnimeList está instável agora. Tente novamente em instantes.` |
+| other 4xx | `A API respondeu com erro {status}.` |
+| `aiohttp.ContentTypeError` | `A API respondeu em um formato inesperado.` |
 | `asyncio.TimeoutError` | `A consulta demorou demais e foi cancelada.` |
 | `aiohttp.ClientError` | `Não consegui falar com a API do MyAnimeList.` |
+| anything else | `Não foi possível concluir a consulta.` |
+
+`ContentTypeError` is checked **before** `ClientResponseError`: it subclasses it
+with `status=0`, so the naive order reports "erro 0" for a non-JSON response.
 
 Rate limits:
 
-- `AsyncLimiter` inside the client already caps the **per-IP** budget; there is
-  exactly one client (§Decision 7), so the budget is not double-spent.
-- Per-user `commands.cooldown` (default 1/5s) protects the shared budget from a
-  single user.
-- 429 is surfaced, never retried in a loop (the limiter already paces us).
+- `AsyncLimiter` inside the client caps the **per-IP** budget; there is exactly
+  one client (§Decision 7), so the budget is not double-spent.
+- Per-user `commands.cooldown` (default 1/5s) stops one user from draining it.
+- A 429 arms a process-wide `RateLimitGuard` for `Retry-After` seconds (default
+  30, capped at 300). While armed, every Jikan command fails fast with the
+  remaining time instead of calling the API — no retry loop, and no command
+  holding a user for a minute waiting on a sleep.
+- The guard is resolved per call (`guard=None` → module `GUARD`) so it can be
+  replaced in tests without rebinding the function default.
 
 ### 3.6 Cog layout
 
@@ -408,9 +421,14 @@ Step 6 note: `anime_api` is created in step 3, so this step only swaps the
 response path.
 
 ### Step 5 — `feat/jikan-errors-and-limits`
-Commit: `feat(jikan): translate API errors and enforce cooldowns`
-— `juliabot/jikan_errors.py` + tests for 404/429/5xx/timeout/connection and the
-cooldown decoration.
+| Commit | Contents |
+|--------|----------|
+| `feat(jikan): translate API errors and enforce cooldowns` | `juliabot/jikan_errors.py` (`call_route`, `translate`, `RateLimitGuard`); the dispatcher calls it instead of the route directly |
+| `test(jikan): cover error translation and the rate-limit guard` | status matrix, 429 header parsing and capping, guard fail-fast, timeouts, connection and content-type errors, plus dispatcher-level 404/429 messages |
+
+Verified against a local `aiohttp` server (404, 429 with `Retry-After: 17`, 503,
+`text/html` body, and a valid payload) to confirm which exceptions the client
+actually raises and that the header is readable.
 
 ### Step 6 — `feat/jikan-api-cogs`
 | Commit | Contents |

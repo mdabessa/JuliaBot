@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from types import SimpleNamespace
 
 import aiohttp
 import pytest
@@ -8,8 +9,11 @@ from discord.ext import commands
 
 from juliabot import jikan_catalog as catalog
 from juliabot import jikan_commands as generator
-from juliabot import jikan_errors
+from juliabot import jikan_errors, jikan_sessions
 from juliabot.cogs import anime_api as anime_api_module
+from juliabot.cogs import help as help_module
+from juliabot.cogs import mal as mal_module
+from juliabot.cogs import manga as manga_module
 
 
 class FakeResponse:
@@ -46,6 +50,13 @@ class FakeContext:
 
     async def send(self, content=None, **kwargs):
         self.sent.append({"content": content, **kwargs})
+
+    async def reply(self, content=None, embed=None, view=None):
+        self.sent.append({"content": content, "embeds": [embed], "view": view})
+        return SimpleNamespace(edit=self._edit)
+
+    async def _edit(self, **_kwargs):
+        return None
 
     @property
     def contents(self) -> list[str]:
@@ -248,24 +259,16 @@ def test_build_commands_skips_curated_routes():
     assert len(built) == sum(1 for spec in specs if not spec.curated)
 
 
-def test_build_commands_respects_the_allowlist():
-    built = generator.build_commands(
-        FakeCog(), catalog.load_specs(), allowlist={"get_anime_themes"}
-    )
-
-    assert [command.name for command in built] == ["anime_themes"]
-
-
 def test_build_commands_skips_names_taken_by_other_commands(caplog):
     existing = commands.Command(_noop, name="anime_themes")
     bot = FakeBot(existing)
 
     with caplog.at_level(logging.WARNING):
-        built = generator.build_commands(
-            FakeCog(bot=bot), catalog.load_specs(), allowlist={"get_anime_themes"}
-        )
+        built = generator.build_commands(FakeCog(bot=bot), catalog.load_specs())
 
-    assert built == ()
+    names = {command.name for command in built}
+    assert "anime_themes" not in names
+    assert len(built) == sum(1 for spec in catalog.load_specs() if not spec.curated) - 1
     assert "already used by another command" in caplog.text
 
 
@@ -334,3 +337,180 @@ async def test_reloading_the_cog_does_not_duplicate_commands():
     finally:
         await bot.remove_cog("anime_api")
         await bot.close()
+
+
+@pytest.mark.asyncio
+async def test_the_three_generated_cogs_expose_every_route(caplog):
+    bot = commands.Bot(command_prefix="!", intents=Intents.default())
+    bot.jikan = FakeClient()
+    cogs = [
+        anime_api_module.AnimeApiCog(bot),
+        manga_module.MangaCog(bot),
+        mal_module.MalCog(bot),
+    ]
+
+    with caplog.at_level(logging.WARNING):
+        for cog in cogs:
+            await bot.add_cog(cog)
+
+    try:
+        specs = [spec for spec in catalog.load_specs() if not spec.curated]
+        missing = [spec.name for spec in specs if bot.get_command(spec.name) is None]
+        assert missing == []
+        assert "Skipping generated command" not in caplog.text
+
+        counts = {
+            cog.qualified_name: len(cog.get_commands()) for cog in bot.cogs.values()
+        }
+        assert counts == {"anime_api": 25, "manga": 18, "mal": 53}
+    finally:
+        for cog in cogs:
+            await bot.remove_cog(cog.qualified_name)
+        await bot.close()
+
+
+@pytest.mark.asyncio
+async def test_generated_cogs_share_one_client_and_one_session():
+    bot = commands.Bot(command_prefix="!", intents=Intents.default())
+    bot.jikan = FakeClient()
+    shared = bot.jikan
+    cogs = [
+        anime_api_module.AnimeApiCog(bot),
+        manga_module.MangaCog(bot),
+        mal_module.MalCog(bot),
+    ]
+
+    try:
+        assert bot.jikan is shared
+        assert all(cog.jikan is shared for cog in cogs)
+        assert bot.sessions.registry.get(jikan_sessions.JIKAN_PAGE) is not None
+    finally:
+        for cog in cogs:
+            await bot.remove_cog(cog.qualified_name)
+        await bot.close()
+
+
+@pytest.mark.asyncio
+async def test_hidden_routes_are_registered_but_not_listed():
+    bot = commands.Bot(command_prefix="!", intents=Intents.default())
+    bot.jikan = FakeClient()
+    cog = mal_module.MalCog(bot)
+
+    await bot.add_cog(cog)
+
+    try:
+        command = bot.get_command("character_ids")
+        assert command is not None
+        assert command.hidden is True
+        assert command in list(cog.walk_commands())
+    finally:
+        await bot.remove_cog(cog.qualified_name)
+        await bot.close()
+
+
+@pytest.mark.asyncio
+async def test_a_paginated_route_starts_a_session_instead_of_dumping_embeds():
+    bot = commands.Bot(command_prefix="!", intents=Intents.default())
+
+    class PagedClient:
+        async def get_top_anime(self, **kwargs):
+            return SimpleNamespace(
+                data=[{"mal_id": 1, "title": "Frieren"}],
+                pagination=SimpleNamespace(has_next_page=True, current_page=1),
+            )
+
+    bot.jikan = PagedClient()
+    cog = mal_module.MalCog(bot)
+    command = generator.build_command(cog, _spec("get_top_anime"))
+    ctx = FakeContext()
+    ctx.bot = bot
+    ctx.author = SimpleNamespace(id=42)
+    ctx.guild = SimpleNamespace(id=10)
+    ctx.channel = SimpleNamespace(id=20, send=None)
+    ctx.message = SimpleNamespace(id=99)
+
+    await command.callback(cog, ctx, raw="type=tv")
+
+    session = bot.sessions.active()[0]
+    assert session.registration.name == jikan_sessions.JIKAN_PAGE
+    assert session.to_payload()["route"] == "get_top_anime"
+    assert session.to_payload()["kwargs"] == {"type": "tv"}
+    assert len(ctx.sent) == 1
+    assert ctx.sent[0]["embeds"][0].title == "Frieren"
+
+
+@pytest.mark.asyncio
+async def test_a_paginated_route_falls_back_to_static_rendering_without_a_manager():
+    cog = FakeCog(jikan=PagedClientForFallback())
+    command = generator.build_command(cog, _spec("get_top_anime"))
+    ctx = FakeContext()
+
+    await command.callback(cog, ctx, raw="")
+
+    assert len(ctx.sent) == 1
+    assert ctx.sent[0]["embeds"][0].description.startswith("• [Frieren]")
+
+
+def _spec(route: str) -> catalog.RouteSpec:
+    return next(spec for spec in catalog.load_specs() if spec.route == route)
+
+
+@pytest.mark.asyncio
+async def test_help_lists_every_visible_generated_command_within_budget():
+    bot = commands.Bot(command_prefix="!", intents=Intents.default())
+    bot.jikan = FakeClient()
+    cogs = [
+        anime_api_module.AnimeApiCog(bot),
+        manga_module.MangaCog(bot),
+        mal_module.MalCog(bot),
+    ]
+    for cog in cogs:
+        await bot.add_cog(cog)
+
+    class HelpContext:
+        prefix = "!"
+        author = SimpleNamespace(id=1)
+        guild = SimpleNamespace(id=10)
+        channel = SimpleNamespace(id=20)
+        message = SimpleNamespace(id=30)
+        command = None
+        permissions = SimpleNamespace()
+
+        def __init__(self) -> None:
+            self.bot = bot
+
+    try:
+        pages = await help_module.build_help_pages(HelpContext(), "!")
+
+        assert pages
+        listed = " ".join(value for page in pages for _name, value in page.fields)
+        for spec in catalog.load_specs():
+            if spec.curated or spec.hidden:
+                continue
+            assert f"`{spec.name}`" in listed, spec.name
+
+        for spec in catalog.load_specs():
+            if not spec.hidden:
+                continue
+            assert f"`{spec.name}`" not in listed, spec.name
+
+        for page in pages:
+            assert sum(len(name) + len(value) for name, value in page.fields) <= 6000
+            assert all(len(value) <= 1024 for _name, value in page.fields)
+
+        titles = " ".join(name for page in pages for name, _value in page.fields)
+        assert "Animes (API)." in titles
+        assert ":books:Mangás." in titles
+        assert ":mag:MyAnimeList." in titles
+    finally:
+        for cog in cogs:
+            await bot.remove_cog(cog.qualified_name)
+        await bot.close()
+
+
+class PagedClientForFallback:
+    async def get_top_anime(self, **_kwargs):
+        return {
+            "data": [{"mal_id": 1, "title": "Frieren", "url": "https://x/1"}],
+            "pagination": {"has_next_page": True, "current_page": 1},
+        }

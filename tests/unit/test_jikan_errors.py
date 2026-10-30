@@ -176,6 +176,27 @@ def test_invalid_json_is_reported(spec, guard):
     assert "formato inesperado" in str(excinfo.value)
 
 
+def test_a_response_the_model_cannot_parse_is_reported(spec, guard):
+    from pydantic import BaseModel, ValidationError
+
+    class Narrow(BaseModel):
+        data: dict
+
+    try:
+        Narrow(data=[1, 2, 3])
+    except ValidationError as error:
+        validation_error = error
+    else:  # pragma: no cover - the model must reject a list here
+        raise AssertionError("expected a validation error")
+
+    client = FlakyClient(validation_error)
+
+    with pytest.raises(jikan_errors.JikanCallError) as excinfo:
+        asyncio.run(jikan_errors.call_route(client, spec, {"anime_id": 1}, guard=guard))
+
+    assert "formato inesperado" in str(excinfo.value)
+
+
 def test_unknown_failures_get_a_generic_message():
     assert "Não foi possível concluir" in str(jikan_errors.translate(ValueError("x")))
 

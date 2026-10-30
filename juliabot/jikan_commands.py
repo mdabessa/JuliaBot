@@ -16,6 +16,7 @@ from discord.ext import commands
 
 from .jikan_args import JikanArgumentError, parse_arguments
 from .jikan_catalog import RouteSpec
+from .jikan_errors import JikanCallError, call_route
 from .jikan_render import RenderResult, render
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,12 @@ def build_command(cog: commands.Cog, spec: RouteSpec) -> commands.Command:
             await ctx.send("O cliente da API de animes não está disponível.")
             return
 
-        payload = await getattr(client, spec.route)(**kwargs)
+        try:
+            payload = await call_route(client, spec, kwargs)
+        except JikanCallError as exc:
+            await ctx.send(str(exc))
+            return
+
         await send_rendered(ctx, render(payload, spec, _color_of(command_cog)))
 
     _dispatch.__name__ = spec.name

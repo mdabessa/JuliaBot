@@ -1,11 +1,14 @@
+import asyncio
 import logging
 
+import aiohttp
 import pytest
 from discord import Intents
 from discord.ext import commands
 
 from juliabot import jikan_catalog as catalog
 from juliabot import jikan_commands as generator
+from juliabot import jikan_errors
 from juliabot.cogs import anime_api as anime_api_module
 
 
@@ -25,6 +28,16 @@ class FakeClient:
     async def get_anime_themes(self, **kwargs):
         self.calls.append(("get_anime_themes", kwargs))
         return FakeResponse(self._data)
+
+
+class FailingClient:
+    def __init__(self, error):
+        self.error = error
+        self.calls = 0
+
+    async def get_anime_themes(self, **_kwargs):
+        self.calls += 1
+        raise self.error
 
 
 class FakeContext:
@@ -161,6 +174,69 @@ async def test_payloads_are_rendered_into_one_message(themes):
     assert len(ctx.sent) == 1
     fields = {field.name: field.value for field in ctx.sent[0]["embeds"][0].fields}
     assert fields == {"Openings": "OP1", "Endings": "ED1"}
+
+
+@pytest.mark.asyncio
+async def test_api_failures_are_answered_with_a_friendly_message(themes):
+    client = FailingClient(
+        aiohttp.ClientResponseError(
+            request_info=None, history=(), status=404, message="nope"
+        )
+    )
+    cog = FakeCog(jikan=client)
+    command = generator.build_command(cog, themes)
+    ctx = FakeContext()
+
+    await command.callback(cog, ctx, raw="999999999")
+
+    assert ctx.contents == ["Não encontrei nada com esse id ou critério."]
+    assert ctx.sent[0].get("embeds") is None
+
+
+@pytest.mark.asyncio
+async def test_a_rate_limited_call_reports_the_wait_and_blocks_the_next_one(themes):
+    client = FailingClient(
+        aiohttp.ClientResponseError(
+            request_info=None,
+            history=(),
+            status=429,
+            message="slow down",
+            headers={"Retry-After": "12"},
+        )
+    )
+    cog = FakeCog(jikan=client)
+    command = generator.build_command(cog, themes)
+    ctx = FakeContext()
+
+    try:
+        await command.callback(cog, ctx, raw="1")
+        assert "limitando as requisições" in ctx.contents[0]
+        assert "12s" in ctx.contents[0]
+        assert client.calls == 1
+
+        await command.callback(cog, ctx, raw="1")
+        assert client.calls == 1, "the second call must not reach the API"
+        assert "limitando as requisições" in ctx.contents[1]
+    finally:
+        jikan_errors.GUARD.reset()
+
+
+@pytest.mark.asyncio
+async def test_successful_calls_are_not_affected_by_the_guard(themes):
+    client = FakeClient()
+    cog = FakeCog(jikan=client)
+    command = generator.build_command(cog, themes)
+
+    await command.callback(cog, FakeContext(), raw="1")
+
+    assert client.calls == [("get_anime_themes", {"anime_id": 1})]
+
+
+def test_command_has_a_per_user_cooldown(themes):
+    command = generator.build_command(FakeCog(), themes)
+
+    assert command.cooldown.rate == 1
+    assert command.cooldown.per == themes.cooldown[1]
 
 
 def test_build_commands_skips_curated_routes():

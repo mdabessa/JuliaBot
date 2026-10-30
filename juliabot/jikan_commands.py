@@ -91,10 +91,39 @@ async def _start_pagination(
     return True
 
 
+async def execute_route(
+    cog: commands.Cog, ctx: commands.Context, spec: RouteSpec, kwargs: dict
+) -> None:
+    """Call one route and answer in the channel.
+
+    Shared by the generated commands and the ``!jikan`` passthrough so both
+    resolve pagination, rendering and error messages the same way.
+    """
+    client = resolve_client(cog)
+    if client is None:
+        await ctx.send("O cliente da API de animes não está disponível.")
+        return
+
+    if spec.shape == SHAPE_PAGINATED and spec.renderer != RENDERER_DEBUG:
+        try:
+            handled = await _start_pagination(cog, ctx, spec, kwargs)
+        except JikanCallError as exc:
+            await ctx.send(str(exc))
+            return
+        if handled:
+            return
+
+    try:
+        payload = await call_route(client, spec, kwargs)
+    except JikanCallError as exc:
+        await ctx.send(str(exc))
+        return
+
+    await send_rendered(ctx, render(payload, spec, _color_of(cog)))
+
+
 def build_command(cog: commands.Cog, spec: RouteSpec) -> commands.Command:
     """Build the command that exposes one route."""
-
-    paginated = spec.shape == SHAPE_PAGINATED and spec.renderer != RENDERER_DEBUG
 
     async def _dispatch(command_cog, ctx: commands.Context, *, raw: str = "") -> None:
         try:
@@ -103,27 +132,7 @@ def build_command(cog: commands.Cog, spec: RouteSpec) -> commands.Command:
             await ctx.send(str(exc))
             return
 
-        client = resolve_client(command_cog)
-        if client is None:
-            await ctx.send("O cliente da API de animes não está disponível.")
-            return
-
-        if paginated:
-            try:
-                handled = await _start_pagination(command_cog, ctx, spec, kwargs)
-            except JikanCallError as exc:
-                await ctx.send(str(exc))
-                return
-            if handled:
-                return
-
-        try:
-            payload = await call_route(client, spec, kwargs)
-        except JikanCallError as exc:
-            await ctx.send(str(exc))
-            return
-
-        await send_rendered(ctx, render(payload, spec, _color_of(command_cog)))
+        await execute_route(command_cog, ctx, spec, kwargs)
 
     _dispatch.__name__ = spec.name
     # A cog command is invoked as ``callback(cog, ctx, ...)``; the qualified

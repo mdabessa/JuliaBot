@@ -4,6 +4,7 @@ import pytest
 
 COGS = [
     "juliabot.cogs.ai",
+    "juliabot.cogs.anime_api",
     "juliabot.cogs.animes",
     "juliabot.cogs.changelog",
     "juliabot.cogs.core",
@@ -12,6 +13,9 @@ COGS = [
     "juliabot.cogs.fun",
     "juliabot.cogs.game",
     "juliabot.cogs.help",
+    "juliabot.cogs.jikan",
+    "juliabot.cogs.mal",
+    "juliabot.cogs.manga",
     "juliabot.cogs.reminder",
     "juliabot.cogs.server_config",
     "juliabot.cogs.twitch",

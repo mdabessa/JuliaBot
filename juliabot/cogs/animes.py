@@ -269,7 +269,11 @@ class AnimesCog(commands.Cog, name="animes"):
 
     def __init__(self, bot: Client) -> None:
         self.bot = bot
-        self.jikan = AioJikan(rate_limit=BOT_JIKAN_RATE_LIMIT)
+        # Another cog may have created the client first; reusing it keeps a
+        # single per-IP rate limiter across the bot.
+        self.jikan = getattr(bot, "jikan", None) or AioJikan(
+            rate_limit=BOT_JIKAN_RATE_LIMIT
+        )
         # Shared with restored sessions, which only have the interaction client.
         bot.jikan = self.jikan
         if not hasattr(bot, "sessions"):

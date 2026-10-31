@@ -197,9 +197,7 @@ async def test_page_renders_aliases_and_a_page_footer():
     assert embed.title == help_module.PAGE_TITLE
     assert embed.footer.text == "Página 1/1"
     assert embed.fields[0].name == ":japanese_goblin:Animes."
-    assert embed.fields[0].value == (
-        "`search_anime` (al) `anime_list` (al)"
-    )
+    assert embed.fields[0].value == ("`search_anime` (al) `anime_list` (al)")
     assert embed.fields[0].inline is True
 
 

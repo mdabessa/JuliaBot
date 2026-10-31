@@ -265,7 +265,6 @@ class NextDate(commands.Converter):
                     if index == len(steps):
                         raise Exception("Data não pode ser menor que a data atual")
 
-
                     if not times[steps[index]][1]:
                         continue
 

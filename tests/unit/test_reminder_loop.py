@@ -163,9 +163,7 @@ def _expire_only(monkeypatch, reminder):
 
 
 @pytest.mark.asyncio
-async def test_monthly_reminder_reschedules_to_the_next_month(
-    monkeypatch, frozen_now
-):
+async def test_monthly_reminder_reschedules_to_the_next_month(monkeypatch, frozen_now):
     """`rml dia8` firing on the 8th must return on the 8th of the next month.
 
     Regression: it used to be rescheduled one hour later on the SAME 8th, so

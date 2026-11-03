@@ -77,6 +77,8 @@ def make_cog(
     title: str | None = None,
     aliases: list[str] | None = None,
     allowed: bool = True,
+    section: str | None = None,
+    hidden: tuple[str, ...] = (),
 ) -> commands.Cog:
     """Build a cog with the requested commands, bound like ``Bot.add_cog``."""
     attrs: dict[str, object] = {}
@@ -86,11 +88,16 @@ def make_cog(
             return None
 
         attrs[command_name] = commands.command(
-            name=command_name, aliases=list(aliases or ())
+            name=command_name,
+            aliases=list(aliases or ()),
+            hidden=command_name in hidden,
         )(callback)
 
     if title is not None:
         attrs["embed_title"] = title
+
+    if section is not None:
+        attrs["help_section"] = section
 
     async def cog_check(_self, _ctx):
         return allowed
@@ -352,3 +359,165 @@ async def test_help_registration_is_channel_scoped_and_not_resumable():
     assert registered.resumable is False
     assert registered.timeout == 120
     assert registered.max_per_scope == 1
+
+
+@pytest.mark.asyncio
+async def test_index_lists_each_cog_with_a_count_and_an_invocation():
+    context = make_context(
+        {
+            "animes": make_cog(
+                "animes",
+                ["search_anime", "anime_list"],
+                title=":japanese_goblin:Animes.",
+            ),
+            "core": make_cog("core", ["ping"]),
+        }
+    )
+
+    pages = await help_module.build_help_index(context)
+
+    assert len(pages) == 1
+    page = pages[0]
+    assert page.kind == help_module.PAGE_KIND_INDEX
+    assert page.title == help_module.PAGE_TITLE
+    assert page.fields == ()
+
+    lines = page.description.splitlines()
+    assert lines[0] == f"**{help_module.MAIN_SECTION_TITLE}**"
+    assert ":japanese_goblin:Animes. — 2 comandos · `!help animes`" in lines
+    # A cog without an embed_title falls back to its registered name, and a
+    # single command keeps the singular form.
+    assert "core — 1 comando · `!help core`" in lines
+    assert lines[-1] == "`!help comando` para detalhes · `!help categoria` para abrir."
+    assert page.cogs == ("animes", "core")
+
+
+@pytest.mark.asyncio
+async def test_index_omits_cogs_the_invoker_cannot_use():
+    context = make_context(
+        {
+            "debug": make_cog("debug", ["reload", "sessions"], allowed=False),
+            "core": make_cog("core", ["ping"], title=":brain:Core."),
+        }
+    )
+
+    pages = await help_module.build_help_index(context)
+
+    assert ":brain:Core." in pages[0].description
+    assert "debug" not in pages[0].description
+    assert pages[0].cogs == ("core",)
+
+
+@pytest.mark.asyncio
+async def test_index_puts_sectioned_cogs_after_the_main_block():
+    context = make_context(
+        {
+            "animes": make_cog("animes", ["search_anime"], title="Animes."),
+            "mal": make_cog(
+                "mal",
+                ["characters", "top"],
+                title=":mag:MyAnimeList.",
+                section="API do MyAnimeList",
+            ),
+        }
+    )
+
+    description = (await help_module.build_help_index(context))[0].description
+    main_block, api_block = description.split("**API do MyAnimeList**")
+
+    assert description.index("**Comandos**") < description.index(
+        "**API do MyAnimeList**"
+    )
+    assert "Animes." in main_block
+    assert ":mag:MyAnimeList." in api_block
+
+
+@pytest.mark.asyncio
+async def test_index_stays_one_embed_for_many_cogs():
+    context = make_context(
+        {
+            f"cog{index:02d}": make_cog(f"cog{index:02d}", [f"cog{index:02d}_cmd"])
+            for index in range(26)
+        }
+    )
+
+    pages = await help_module.build_help_index(context)
+
+    assert len(pages) == 1
+    assert len(pages[0].description) <= help_module.MAX_DESCRIPTION
+
+
+@pytest.mark.asyncio
+async def test_index_spills_into_numbered_pages_past_the_description_limit(
+    monkeypatch,
+):
+    monkeypatch.setattr(help_module, "MAX_DESCRIPTION", 160)
+    context = make_context(
+        {
+            f"cog{index:02d}": make_cog(f"cog{index:02d}", [f"cog{index:02d}_cmd"])
+            for index in range(6)
+        }
+    )
+
+    pages = await help_module.build_help_index(context)
+
+    assert len(pages) > 1
+    assert pages[0].title == f"{help_module.PAGE_TITLE} (1/{len(pages)})"
+    assert "para detalhes" not in pages[0].description
+    assert "para detalhes" in pages[-1].description
+    for page in pages:
+        assert page.kind == help_module.PAGE_KIND_INDEX
+        assert page.fields == ()
+        assert page.description == page.description.strip("\n")
+
+
+@pytest.mark.asyncio
+async def test_cog_pages_ignore_the_three_cog_page_cap():
+    bulk = [f"command_{index:03d}" for index in range(120)]
+    context = make_context(
+        {
+            "alpha": make_cog(
+                "alpha", bulk, title=":alpha:Alpha.", aliases=["a0", "b0", "c0"]
+            )
+        }
+    )
+
+    pages = await help_module.build_cog_pages(context, "!", "alpha")
+
+    assert len(pages) == 1
+    page = pages[0]
+    assert page.kind == help_module.PAGE_KIND_COMMANDS
+    assert page.title == ":alpha:Alpha."
+    assert page.cogs == ("alpha",)
+    assert page.description == "!help comando para detalhes"
+    # Continuation fields are allowed to exceed the cogs-per-page count.
+    assert len(page.fields) > help_module.COGS_PER_PAGE
+    assert len(page.fields) <= help_module.MAX_FIELDS_PER_PAGE
+    listing = " ".join(value for _, value in page.fields)
+    assert listing.count("`command_") == 120
+    assert all(len(value) <= help_module.MAX_FIELD_VALUE for _, value in page.fields)
+
+
+@pytest.mark.asyncio
+async def test_cog_pages_skip_hidden_commands():
+    context = make_context(
+        {
+            "core": make_cog(
+                "core", ["ping", "secret"], title=":brain:Core.", hidden=("secret",)
+            )
+        }
+    )
+
+    pages = await help_module.build_cog_pages(context, "!", "core")
+
+    assert len(pages) == 1
+    assert "`ping`" in pages[0].fields[0][1]
+    assert "secret" not in pages[0].fields[0][1]
+
+
+@pytest.mark.asyncio
+async def test_cog_pages_for_an_unknown_or_empty_cog_are_empty():
+    context = make_context({"core": make_cog("core", ["ping"])})
+
+    assert await help_module.build_cog_pages(context, "!", "nope") == []
+    assert await help_module.build_cog_pages(context, "!", "") == []

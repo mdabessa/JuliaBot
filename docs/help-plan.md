@@ -7,7 +7,7 @@ the listing is now drowned by the generated Jikan commands. This plan keeps the
 #7 rendering work intact and changes *what page 1 shows* and *how deep the listing
 goes*, so the help surface stops growing with the API surface.
 
-Status: **plan only — no implementation started.**
+Status: **slice 1 (builders) implemented.** Slices 2–4 pending.
 
 ---
 
@@ -117,17 +117,20 @@ Description layout, grouped by `section`, empty sections omitted:
 
 ```
 **Comandos**
-`:brain:Core.` — 5 · `!help core`
-`:game_die:Diversão.` — 2 · `!help fun`
+:brain:Core. — 5 comandos · `!help core`
+:game_die:Diversão. — 2 comandos · `!help fun`
 ...
 
 **API do MyAnimeList**
-`Animes (API).` — 25 · `!help anime_api`
-`:books:Mangás.` — 18 · `!help manga`
-`:mag:MyAnimeList.` — 53 · `!help mal`
+Animes (API). — 25 comandos · `!help anime_api`
+:books:Mangás. — 18 comandos · `!help manga`
+:mag:MyAnimeList. — 53 comandos · `!help mal`
 
-`!help <comando>` para detalhes · `!help <categoria>` para abrir.
+`!help comando` para detalhes · `!help categoria` para abrir.
 ```
+
+- Counts read `1 comando` in the singular. The section header is the only bold
+text; titles are left plain so they read like the field names on level 2.
 
 - No fields, no footer pagination when there is a single page.
 - `HelpPage` gains a `kind: str` discriminator (`"index"` / `"commands"`) so
@@ -213,9 +216,10 @@ def _suggestions(candidates: Iterable[str], query: str) -> str
 
 Each slice leaves the bot runnable and `pytest` green.
 
-1. **Builders.** Add `CogEntry`, `collect_cogs`, `build_help_index`,
-   `build_cog_pages`, `HelpPage.kind`. Keep `HelpPagination` on the old flat
-   builder for this slice so only the pure-function tests move.
+1. ✅ **Builders — done.** `CogEntry`, `collect_cogs`, `_index_lines`,
+   `_chunk_index`, `build_help_index`, `build_cog_pages`, `_chunk_fields`,
+   `HelpPage.kind`. `HelpPagination` still runs on the old flat builder, so only
+   the pure-function tests moved.
 2. **Session level switch.** Point `load_items()` at the new builders, add
    `show_index` + `extra_actions`. Level 1 now renders the index; `!help <cog>`
    renders level 2.
@@ -233,7 +237,8 @@ Each slice leaves the bot runnable and `pytest` green.
 | `tests/unit/test_cog_commands.py::_run_help_help` | Currently asserts `field.name` contains `":question:Help."` and `field.value` contains `` `help` (ajuda) `` on page 1. Level 1 is now a description list, so this case asserts the index lists both cogs with counts and keeps `embed.title == "Lista de Comandos"`; the alias assertion moves to a per-cog case. |
 | `tests/unit/test_cog_commands.py::_run_help_help_cog_jump` | Still valid (`payload["index"] == 0`, first field is the cog's title) — the embed title assertion needs to become the cog title. |
 | `tests/unit/test_jikan_commands.py::test_help_lists_every_visible_generated_command_within_budget` | Today it concatenates `build_help_pages` fields. Change to: the index lists the three generated cog lines under the API section, then concatenate `build_cog_pages` for `anime_api`, `manga`, `mal` and assert every non-`hidden`, non-`curated` spec still appears and every hidden one does not. |
-| New cases | `test_index_lists_every_cog_with_a_count`; `test_index_stays_one_page_with_26_cogs`; `test_index_groups_generated_cogs_under_the_api_section`; `test_cog_page_ignores_the_three_cog_cap`; `test_show_index_returns_to_level_one`; `test_unknown_argument_suggests_close_matches`; `test_unknown_argument_without_matches_keeps_the_plain_message`. |
+| New cases — builder (slice 1, shipped) | `test_index_lists_each_cog_with_a_count_and_an_invocation`; `test_index_omits_cogs_the_invoker_cannot_use`; `test_index_puts_sectioned_cogs_after_the_main_block`; `test_index_stays_one_embed_for_many_cogs`; `test_index_spills_into_numbered_pages_past_the_description_limit`; `test_cog_pages_ignore_the_three_cog_page_cap`; `test_cog_pages_skip_hidden_commands`; `test_cog_pages_for_an_unknown_or_empty_cog_are_empty`. |
+| New cases — session / command (slices 2 and 4, pending) | `test_show_index_returns_to_level_one`; `test_unknown_argument_suggests_close_matches`; `test_unknown_argument_without_matches_keeps_the_plain_message`. |
 
 `tests/smoke/test_cogs_smoke.py` needs no change (imports only).
 

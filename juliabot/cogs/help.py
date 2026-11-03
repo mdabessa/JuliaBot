@@ -4,6 +4,11 @@
 one embed per page of three cogs, so the menu never grows past Discord's embed
 limits. Pages are computed once against the invoking context and the session
 only navigates them. ``!help <command>`` keeps the one-shot detail embed.
+
+:func:`build_help_index` and :func:`build_cog_pages` describe the two-level
+layout the session moves to next: a one-embed category index and the command
+grid of a single cog. :func:`build_help_pages` still backs the live session
+until that wiring lands.
 """
 
 import logging
@@ -32,11 +37,20 @@ PAGE_TITLE = "Lista de Comandos"
 COGS_PER_PAGE = 3
 MAX_FIELDS_PER_PAGE = 25
 MAX_FIELD_VALUE = 1024
+MAX_DESCRIPTION = 4096
 MAX_EMBED_LENGTH = 6000
 # Title, description, footer, and padding fields are reserved up front so cogs
 # can be packed against one value budget without re-measuring the whole embed.
 EMBED_OVERHEAD = 256
 PADDING_FIELD = ("** **", "** **")
+
+# Page kinds: the index lists categories, a commands page lists one cog's grid.
+PAGE_KIND_INDEX = "index"
+PAGE_KIND_COMMANDS = "commands"
+# Cogs without a ``help_section`` land in the main "Comandos" block, which is
+# rendered first so hand-written commands stay one glance away.
+MAIN_SECTION = ""
+MAIN_SECTION_TITLE = "Comandos"
 
 
 @dataclass(frozen=True)
@@ -47,6 +61,17 @@ class HelpPage:
     description: str
     fields: tuple[tuple[str, str], ...]
     cogs: tuple[str, ...] = ()
+    kind: str = PAGE_KIND_COMMANDS
+
+
+@dataclass(frozen=True)
+class CogEntry:
+    """One cog as the category index needs to describe it."""
+
+    name: str
+    title: str
+    section: str
+    command_count: int
 
 
 def _command_label(command: commands.Command) -> str:
@@ -186,6 +211,192 @@ async def build_help_pages(ctx: commands.Context, prefix: str = "!") -> list[Hel
             )
         )
     return pages
+
+
+def _section_of(cog: commands.Cog) -> str:
+    """Return the index section a cog belongs to, defaulting to the main one.
+
+    Read through ``getattr`` so the help cog never imports the Jikan subsystem
+    just to learn which cogs are generated; a cog opts in by declaring a
+    ``help_section`` class attribute, like it already declares ``embed_title``.
+    """
+    section = getattr(cog, "help_section", "")
+    return section if isinstance(section, str) else ""
+
+
+def _count_label(amount: int) -> str:
+    """Render a command count with the right plural."""
+    return f"{amount} comando" if amount == 1 else f"{amount} comandos"
+
+
+def _chunk_fields(
+    fields: list[tuple[str, str]], max_fields: int
+) -> list[tuple[tuple[str, str], ...]]:
+    """Pack one cog's fields into pages, ignoring the cog-count cap.
+
+    A category page holds a single cog, so only Discord's per-value and total
+    embed budgets bound it; ``COGS_PER_PAGE`` applies to the flat listing and
+    must never be the reason a cog is split.
+    """
+    char_budget = MAX_EMBED_LENGTH - EMBED_OVERHEAD
+    pages: list[tuple[tuple[str, str], ...]] = []
+    current: list[tuple[str, str]] = []
+    used = 0
+
+    for field in fields:
+        cost = len(field[0]) + len(field[1])
+        if current and (len(current) >= max_fields or used + cost > char_budget):
+            pages.append(tuple(current))
+            current, used = [], 0
+        current.append(field)
+        used += cost
+
+    if current:
+        pages.append(tuple(current))
+    return pages
+
+
+async def collect_cogs(ctx: commands.Context) -> list[CogEntry]:
+    """Describe every cog the invoking user can see, in registration order.
+
+    Counts come from :func:`_visible_commands` rather than ``get_commands`` so
+    an owner-only cog reports nothing to everyone else and disappears from the
+    index entirely.
+    """
+    bot = getattr(ctx, "bot", None)
+    cogs = getattr(bot, "cogs", {}) or {}
+
+    entries: list[CogEntry] = []
+    for cog_name, cog in cogs.items():
+        visible = await _visible_commands(cog, ctx)
+        if not visible:
+            continue
+        entries.append(
+            CogEntry(
+                name=cog_name,
+                title=_cog_title(cog, cog_name),
+                section=_section_of(cog),
+                command_count=len(visible),
+            )
+        )
+    return entries
+
+
+def _index_lines(entries: list[CogEntry], prefix: str) -> list[tuple[str, str]]:
+    """Render the index as ``(line, cog name)`` pairs, grouped by section.
+
+    Block headers and the blank separator between blocks carry no cog name, so
+    callers can collect the cogs of one page without re-parsing the text.
+    """
+    sections: dict[str, list[CogEntry]] = {}
+    for entry in entries:
+        sections.setdefault(entry.section, []).append(entry)
+
+    order = [MAIN_SECTION] if MAIN_SECTION in sections else []
+    order.extend(section for section in sections if section != MAIN_SECTION)
+
+    lines: list[tuple[str, str]] = []
+    for position, section in enumerate(order):
+        if position:
+            lines.append(("", ""))
+        header = MAIN_SECTION_TITLE if section == MAIN_SECTION else section
+        lines.append((f"**{header}**", ""))
+        for entry in sections[section]:
+            line = (
+                f"{entry.title} — {_count_label(entry.command_count)} · "
+                f"`{prefix}help {entry.name}`"
+            )
+            lines.append((line, entry.name))
+    return lines
+
+
+def _chunk_index(
+    lines: list[tuple[str, str]], budget: int
+) -> list[list[tuple[str, str]]]:
+    """Pack index lines into description-sized pages."""
+    chunks: list[list[tuple[str, str]]] = []
+    current: list[tuple[str, str]] = []
+    used = 0
+
+    for line, cog_name in lines:
+        cost = len(line) + 1
+        if current and used + cost > budget:
+            chunks.append(current)
+            current, used = [], 0
+        current.append((line, cog_name))
+        used += cost
+
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+async def build_help_index(ctx: commands.Context, prefix: str = "!") -> list[HelpPage]:
+    """Build the category index: one line per cog, grouped by section.
+
+    The index is a description list rather than a field grid so its size tracks
+    the number of cogs, not the number of commands behind them.
+    """
+    entries = await collect_cogs(ctx)
+    if not entries:
+        return []
+
+    hint = (
+        f"`{prefix}help comando` para detalhes · "
+        f"`{prefix}help categoria` para abrir."
+    )
+    lines = _index_lines(entries, prefix)
+    chunks = _chunk_index(lines, MAX_DESCRIPTION - len(hint) - 1)
+
+    pages: list[HelpPage] = []
+    for position, chunk in enumerate(chunks):
+        description = "\n".join(line for line, _ in chunk).strip("\n")
+        if position == len(chunks) - 1:
+            description = f"{description}\n{hint}"
+        pages.append(
+            HelpPage(
+                title=(
+                    PAGE_TITLE
+                    if len(chunks) == 1
+                    else f"{PAGE_TITLE} ({position + 1}/{len(chunks)})"
+                ),
+                description=description,
+                fields=(),
+                cogs=tuple(name for _, name in chunk if name),
+                kind=PAGE_KIND_INDEX,
+            )
+        )
+    return pages
+
+
+async def build_cog_pages(
+    ctx: commands.Context, prefix: str = "!", cog_name: str = ""
+) -> list[HelpPage]:
+    """Build the command pages of a single cog, with no cog-count cap."""
+    bot = getattr(ctx, "bot", None)
+    cogs = getattr(bot, "cogs", {}) or {}
+    cog = cogs.get(cog_name)
+    if cog is None:
+        return []
+
+    visible = await _visible_commands(cog, ctx)
+    if not visible:
+        return []
+
+    title = _cog_title(cog, cog_name)
+    fields = _cog_fields(title, [_command_label(command) for command in visible])
+    description = f"{prefix}help comando para detalhes"
+
+    return [
+        HelpPage(
+            title=title,
+            description=description,
+            fields=chunk,
+            cogs=(cog_name,),
+            kind=PAGE_KIND_COMMANDS,
+        )
+        for chunk in _chunk_fields(fields, MAX_FIELDS_PER_PAGE)
+    ]
 
 
 async def resolve_prefix(context) -> str:

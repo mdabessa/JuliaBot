@@ -8,9 +8,10 @@ and the session only navigates them. ``!help <command>`` keeps the one-shot
 detail embed.
 """
 
+import difflib
 import logging
 from dataclasses import dataclass
-from typing import Optional
+from typing import Iterable, Optional
 
 from discord import Embed
 from discord.ext import commands
@@ -331,6 +332,43 @@ async def build_cog_pages(
     ]
 
 
+async def _candidate_labels(ctx: commands.Context) -> list[str]:
+    """Collect the labels a suggestion may point at; never raises.
+
+    Suggestions are best effort: an unknown argument must still get its plain
+    "not found" answer when the cog tree cannot be walked, so a structural
+    failure degrades to an empty pool instead of failing the command.
+    """
+    bot = getattr(ctx, "bot", None)
+    cogs = getattr(bot, "cogs", {}) or {}
+
+    labels: list[str] = []
+    try:
+        for cog_name, cog in cogs.items():
+            labels.append(cog_name)
+            labels.append(_cog_title(cog, cog_name))
+            for command in await _visible_commands(cog, ctx):
+                labels.append(command.name)
+                labels.extend(command.aliases)
+    except Exception:
+        logger.warning("Could not build help suggestions", exc_info=True)
+        return []
+
+    # A cog without an ``embed_title`` contributes its name twice.
+    return list(dict.fromkeys(labels))
+
+
+def _suggestions(labels: Iterable[str], query: str) -> str:
+    """Return a "did you mean" suffix for an unknown help argument."""
+    if not query:
+        return ""
+    matches = difflib.get_close_matches(query, list(labels), n=3, cutoff=0.6)
+    if not matches:
+        return ""
+    rendered = ", ".join(f"`{name}`" for name in matches)
+    return f" Talvez você quis dizer: {rendered}."
+
+
 async def resolve_prefix(context) -> str:
     """Return the command prefix for a command context or an interaction."""
     prefix = getattr(context, "prefix", None)
@@ -528,8 +566,10 @@ class HelpCog(commands.Cog, name="help"):
             await self._start_pages(ctx, cog_name=name)
             return
 
+        suggestions = _suggestions(await _candidate_labels(ctx), name)
         await ctx.send(
             f"Nenhum comando/categoria encontrado com o nome de `{argument}`!"
+            f"{suggestions}"
         )
 
 

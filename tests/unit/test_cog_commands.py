@@ -910,6 +910,53 @@ async def _run_help_help_command_detail(
     assert bot.sessions.active() == ()
 
 
+@pytest.mark.asyncio
+async def test_help_unknown_argument_suggests_a_similar_command():
+    bot, ctx = _make_ctx(content="!help pign")
+    core_cog = core_module.CoreCog(bot)
+    help_cog = help_module.HelpCog(bot)
+    bot.cogs = {"core": core_cog, "help": help_cog}
+
+    await help_module.HelpCog.help.callback(help_cog, ctx, argument="pign")
+
+    content = ctx.channel.sent_messages[-1].content
+    assert (
+        "Nenhum comando/categoria encontrado" in content
+    ), "help::help should still report the miss"
+    assert (
+        "Talvez você quis dizer: `ping`." in content
+    ), "help::help should suggest the command the typo was aiming at"
+
+
+@pytest.mark.asyncio
+async def test_help_unknown_argument_suggests_a_category():
+    bot, ctx = _make_ctx(content="!help cor")
+    core_cog = core_module.CoreCog(bot)
+    help_cog = help_module.HelpCog(bot)
+    bot.cogs = {"core": core_cog, "help": help_cog}
+
+    await help_module.HelpCog.help.callback(help_cog, ctx, argument="cor")
+
+    content = ctx.channel.sent_messages[-1].content
+    assert (
+        "Talvez você quis dizer: `core`." in content
+    ), "help::help should suggest categories too"
+
+
+@pytest.mark.asyncio
+async def test_help_unknown_argument_without_matches_keeps_the_plain_message():
+    bot, ctx = _make_ctx(content="!help zzzzzz")
+    core_cog = core_module.CoreCog(bot)
+    help_cog = help_module.HelpCog(bot)
+    bot.cogs = {"core": core_cog, "help": help_cog}
+
+    await help_module.HelpCog.help.callback(help_cog, ctx, argument="zzzzzz")
+
+    assert ctx.channel.sent_messages[-1].content == (
+        "Nenhum comando/categoria encontrado com o nome de `zzzzzz`!"
+    )
+
+
 async def _run_reminder_list(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
     bot, ctx = _make_ctx(content="!list_reminders")
     cog = reminder_module._ReminderCog(bot)

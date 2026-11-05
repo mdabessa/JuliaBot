@@ -7,8 +7,9 @@ the listing is now drowned by the generated Jikan commands. This plan keeps the
 #7 rendering work intact and changes *what page 1 shows* and *how deep the listing
 goes*, so the help surface stops growing with the API surface.
 
-Status: **slices 1–3 implemented** (builders, session level switch, section
-grouping). Slice 4 (fuzzy fallback) pending.
+Status: **all four slices implemented.** `!help` renders a one-embed category
+index, `!help <cog>` renders that cog's grid, and an unknown argument gets
+close-match suggestions.
 
 ---
 
@@ -202,15 +203,17 @@ shadows a command with a same-named cog.
 ### 3.6 Fuzzy fallback (option F)
 
 ```python
-def _suggestions(candidates: Iterable[str], query: str) -> str
+async def _candidate_labels(ctx) -> list[str]
+def _suggestions(labels: Iterable[str], query: str) -> str
 ```
 
-- Candidate pool: visible command names, their aliases, cog names, cog titles.
-- `difflib.get_close_matches(query, candidates, n=3, cutoff=0.6)`, rendered as
+- Candidate pool: visible command names, their aliases, cog names, cog titles,
+  de-duplicated in insertion order.
+- `difflib.get_close_matches(query, labels, n=3, cutoff=0.6)`, rendered as
   `` Talvez você quis dizer: `a`, `b`. `` — same wording shape as
   `juliabot/cogs/jikan.py::_suggestions`.
-- Best-effort: any failure to build the pool degrades to the current plain
-  message rather than erroring the command.
+- Best-effort: any failure to build the pool degrades to the plain miss message
+  rather than erroring the command.
 
 ---
 
@@ -230,7 +233,8 @@ Each slice leaves the bot runnable and `pytest` green.
 3. ✅ **Section grouping — done.** `help_section = "API do MyAnimeList"` on
    `GeneratedRoutesCog`, read by the index through
    `getattr(cog, "help_section", "")`.
-4. **Fuzzy fallback.** Add `_suggestions` and wire the miss branch.
+4. ✅ **Fuzzy fallback — done.** `_candidate_labels` + `_suggestions` append
+   ``Talvez você quis dizer: …`` to the miss message.
 
 ---
 
@@ -243,7 +247,7 @@ Each slice leaves the bot runnable and `pytest` green.
 | `tests/unit/test_cog_commands.py::_run_help_help_cog_jump` | Still valid (`payload["index"] == 0`, first field is the cog's title) — the embed title assertion needs to become the cog title. |
 | `tests/unit/test_jikan_commands.py::test_help_lists_every_visible_generated_command_within_budget` | Rewritten: the index must name the three generated cogs under `**API do MyAnimeList**` with no `**Comandos**` block, and `build_cog_pages` for `anime_api`, `manga` and `mal` must still list every non-`hidden`, non-`curated` spec while omitting every hidden one. |
 | New cases — builder (slice 1, shipped) | `test_index_lists_each_cog_with_a_count_and_an_invocation`; `test_index_omits_cogs_the_invoker_cannot_use`; `test_index_puts_sectioned_cogs_after_the_main_block`; `test_index_stays_one_embed_for_many_cogs`; `test_index_spills_into_numbered_pages_past_the_description_limit`; `test_cog_pages_ignore_the_three_cog_page_cap`; `test_cog_pages_skip_hidden_commands`; `test_cog_pages_for_an_unknown_or_empty_cog_are_empty`. |
-| New cases — session / command (slices 2 and 4, pending) | `test_show_index_returns_to_level_one`; `test_unknown_argument_suggests_close_matches`; `test_unknown_argument_without_matches_keeps_the_plain_message`. |
+| New cases — session / command (shipped) | `test_show_index_returns_to_the_index_in_place`; `test_session_exposes_a_categorias_action`; `test_help_unknown_argument_suggests_a_similar_command`; `test_help_unknown_argument_suggests_a_category`; `test_help_unknown_argument_without_matches_keeps_the_plain_message`. |
 
 `tests/smoke/test_cogs_smoke.py` needs no change (imports only).
 

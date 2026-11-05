@@ -203,6 +203,10 @@ class GeneratedRoutesCog(commands.Cog):
 
     route_group: str = ""
     embed_title: str = ""
+    # Presentation only: ``!help`` groups every generated cog under this
+    # heading so the category index does not lead with 96 API routes. Read by
+    # the help cog through ``getattr`` to keep it free of this import.
+    help_section: str = "API do MyAnimeList"
 
     def __init__(self, bot) -> None:
         self.bot = bot

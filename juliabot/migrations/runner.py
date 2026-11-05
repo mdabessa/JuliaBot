@@ -97,13 +97,17 @@ def _has_schema_table(connection: Connection) -> bool:
 
 def _ensure_schema_table(connection: Connection) -> None:
     """Create the version table if it does not exist."""
-    connection.execute(text(f"""
+    connection.execute(
+        text(
+            f"""
             CREATE TABLE IF NOT EXISTS {SCHEMA_TABLE} (
                 version INTEGER NOT NULL PRIMARY KEY,
                 name VARCHAR(128) NOT NULL,
                 applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
-            """))
+            """
+        )
+    )
 
 
 def _applied_versions(connection: Connection) -> set[int]:

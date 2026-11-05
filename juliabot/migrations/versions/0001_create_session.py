@@ -24,7 +24,9 @@ def _timestamp_type(connection: Connection) -> str:
 def upgrade(connection: Connection) -> None:
     """Create the session table and its lookup indexes."""
     timestamp = _timestamp_type(connection)
-    connection.execute(text(f"""
+    connection.execute(
+        text(
+            f"""
             CREATE TABLE session (
                 id VARCHAR(32) NOT NULL PRIMARY KEY,
                 kind VARCHAR(128) NOT NULL,
@@ -40,7 +42,9 @@ def upgrade(connection: Connection) -> None:
                 last_seen_at {timestamp} NOT NULL,
                 expires_at {timestamp} NOT NULL
             )
-            """))
+            """
+        )
+    )
     connection.execute(text("CREATE INDEX ix_session_kind ON session (kind)"))
     connection.execute(
         text("CREATE INDEX ix_session_expires_at ON session (expires_at)")

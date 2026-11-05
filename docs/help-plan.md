@@ -7,7 +7,8 @@ the listing is now drowned by the generated Jikan commands. This plan keeps the
 #7 rendering work intact and changes *what page 1 shows* and *how deep the listing
 goes*, so the help surface stops growing with the API surface.
 
-Status: **slice 1 (builders) implemented.** Slices 2–4 pending.
+Status: **slices 1–2 implemented** (builders + session level switch). Slices 3–4
+pending.
 
 ---
 
@@ -132,7 +133,8 @@ Animes (API). — 25 comandos · `!help anime_api`
 - Counts read `1 comando` in the singular. The section header is the only bold
 text; titles are left plain so they read like the field names on level 2.
 
-- No fields, no footer pagination when there is a single page.
+- No fields, and no `Página i/N` footer: the index is a menu, not a numbered
+  listing. Level 2 keeps the footer.
 - `HelpPage` gains a `kind: str` discriminator (`"index"` / `"commands"`) so
   `render_item` knows which layout to build. `fields` stays `()` for the index.
 - The `Comandos` section is always emitted first, which is the mitigation for
@@ -220,9 +222,11 @@ Each slice leaves the bot runnable and `pytest` green.
    `_chunk_index`, `build_help_index`, `build_cog_pages`, `_chunk_fields`,
    `HelpPage.kind`. `HelpPagination` still runs on the old flat builder, so only
    the pure-function tests moved.
-2. **Session level switch.** Point `load_items()` at the new builders, add
-   `show_index` + `extra_actions`. Level 1 now renders the index; `!help <cog>`
-   renders level 2.
+2. ✅ **Session level switch — done.** `load_items()` builds the index or one
+   cog's pages from the `cog` payload key, `show_index` switches level in place
+   through `_reload()`, and `Categorias` is an `extra_action`. The flat
+   `build_help_pages` / `_chunk_cogs` / `PADDING_FIELD` / `COGS_PER_PAGE` path is
+   gone, along with the tests that pinned its three-cog grid.
 3. **Section grouping.** Add `help_section = "API do MyAnimeList"` to
    `GeneratedRoutesCog` and group the index by `getattr(cog, "help_section", "")`.
 4. **Fuzzy fallback.** Add `_suggestions` and wire the miss branch.
@@ -306,10 +310,14 @@ Each slice leaves the bot runnable and `pytest` green.
 
 ## 10. Appendix — facts this plan relies on
 
-- `juliabot/cogs/help.py` — `COGS_PER_PAGE = 3`, `HELP_PAGES = "help.pages"`,
-  `PAGE_TITLE = "Lista de Comandos"`, `PADDING_FIELD`, `_cog_fields`,
-  `_chunk_cogs`, `_visible_commands`, `build_help_pages`, `HelpPagination`
-  (`requested_cog` reads `payload["cog"]`), `HelpCog.help`.
+- `juliabot/cogs/help.py` — `HELP_PAGES = "help.pages"`,
+  `PAGE_TITLE = "Lista de Comandos"`, `PAGE_KIND_INDEX` / `PAGE_KIND_COMMANDS`,
+  `MAIN_SECTION`, `_cog_fields`, `_chunk_fields`, `_visible_commands`,
+  `collect_cogs`, `build_help_index`, `build_cog_pages`, `HelpPagination`
+  (`requested_cog` reads `payload["cog"]` and doubles as the level selector,
+  `extra_actions` exposes `Categorias`), `HelpCog.help`.
+- Removed with slice 2: `build_help_pages`, `_chunk_cogs`, `PADDING_FIELD`,
+  `COGS_PER_PAGE`. Anything quoting them is describing the pre-change layout.
 - `juliabot/jikan_commands.py:168` — `build_commands` (skips `spec.curated`,
   logs collisions); `GeneratedRoutesCog` extends `self.__cog_commands__`.
 - `juliabot/jikan_catalog.py:151` — `_HIDDEN_ROUTES`; `POLICY` adds

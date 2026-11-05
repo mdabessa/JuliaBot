@@ -152,41 +152,13 @@ def render(page: help_module.HelpPage, index: int = 0, total: int = 1) -> Embed:
     embed = Embed(title=page.title, description=page.description, color=0)
     for name, value in page.fields:
         embed.add_field(name=name, value=value, inline=True)
-    embed.set_footer(text=f"Página {index + 1}/{total}")
+    if page.kind != help_module.PAGE_KIND_INDEX:
+        embed.set_footer(text=f"Página {index + 1}/{total}")
     return embed
 
 
 @pytest.mark.asyncio
-async def test_pages_hold_three_cogs_and_pad_partial_rows():
-    context = make_context(
-        {
-            "animes": make_cog(
-                "animes",
-                ["search_anime", "anime_list"],
-                title=":japanese_goblin:Animes.",
-                aliases=["al"],
-            ),
-            "core": make_cog("core", ["ping"]),
-            "fun": make_cog("fun", ["dice"]),
-            "help": make_cog("help", ["help"]),
-        }
-    )
-
-    pages = await help_module.build_help_pages(context)
-
-    assert [page.cogs for page in pages] == [
-        ("animes", "core", "fun"),
-        ("help",),
-    ]
-    assert all(len(page.fields) % 3 == 0 for page in pages)
-    assert pages[1].fields[1:] == (
-        help_module.PADDING_FIELD,
-        help_module.PADDING_FIELD,
-    )
-
-
-@pytest.mark.asyncio
-async def test_page_renders_aliases_and_a_page_footer():
+async def test_cog_page_renders_aliases_and_a_page_footer():
     context = make_context(
         {
             "animes": make_cog(
@@ -198,10 +170,10 @@ async def test_page_renders_aliases_and_a_page_footer():
         }
     )
 
-    pages = await help_module.build_help_pages(context)
+    pages = await help_module.build_cog_pages(context, "!", "animes")
     embed = render(pages[0], 0, 1)
 
-    assert embed.title == help_module.PAGE_TITLE
+    assert embed.title == ":japanese_goblin:Animes."
     assert embed.footer.text == "Página 1/1"
     assert embed.fields[0].name == ":japanese_goblin:Animes."
     assert embed.fields[0].value == ("`search_anime` (al) `anime_list` (al)")
@@ -212,38 +184,32 @@ async def test_page_renders_aliases_and_a_page_footer():
 async def test_commands_without_aliases_render_bare():
     context = make_context({"core": make_cog("core", ["ping", "prefix"])})
 
-    pages = await help_module.build_help_pages(context)
+    pages = await help_module.build_cog_pages(context, "!", "core")
 
     assert pages[0].fields[0][1] == "`ping` `prefix`"
 
 
 @pytest.mark.asyncio
-async def test_pages_stay_inside_every_embed_budget():
-    cogs: dict[str, commands.Cog] = {
-        "bulk": make_cog(
-            "bulk",
-            [f"bulk_{index:02d}" for index in range(30)],
-            aliases=["b1", "b2", "b3"],
-        )
-    }
-    for index in range(25):
-        cogs[f"cog{index:02d}"] = make_cog(
-            f"cog{index:02d}", [f"cog{index:02d}_cmd"], aliases=["cc"]
-        )
+async def test_cog_page_stays_inside_every_embed_budget():
+    context = make_context(
+        {
+            "bulk": make_cog(
+                "bulk",
+                [f"bulk_{index:02d}" for index in range(30)],
+                title=":package:Bulk.",
+                aliases=["b1", "b2", "b3"],
+            )
+        }
+    )
 
-    context = make_context(cogs)
-    pages = await help_module.build_help_pages(context)
+    pages = await help_module.build_cog_pages(context, "!", "bulk")
 
-    assert len(context.bot.cogs) == 26
-    assert len(pages) == 9
-    for index, page in enumerate(pages):
-        embed = render(page, index, len(pages))
-        assert len(page.fields) <= help_module.MAX_FIELDS_PER_PAGE
-        for _, value in page.fields:
-            assert len(value) <= help_module.MAX_FIELD_VALUE
-        assert len(embed) <= help_module.MAX_EMBED_LENGTH
-        # Only the final padded row may be `** **` filler.
-        assert sum(1 for name, _ in page.fields if name != "** **") <= 3
+    assert len(pages) == 1
+    page = pages[0]
+    assert len(page.fields) <= help_module.MAX_FIELDS_PER_PAGE
+    for _, value in page.fields:
+        assert len(value) <= help_module.MAX_FIELD_VALUE
+    assert len(render(page)) <= help_module.MAX_EMBED_LENGTH
 
 
 @pytest.mark.asyncio
@@ -256,31 +222,28 @@ async def test_oversized_cogs_split_into_continuation_fields():
         }
     )
 
-    pages = await help_module.build_help_pages(context)
+    alpha = await help_module.build_cog_pages(context, "!", "alpha")
+    beta = await help_module.build_cog_pages(context, "!", "beta")
 
-    names = [
-        name
-        for page in pages
-        for name, _ in page.fields
-        if name != help_module.PADDING_FIELD[0]
-    ]
-    assert names == [
+    assert [name for page in alpha for name, _ in page.fields] == [
         "alpha (1/2)",
         "alpha (2/2)",
+    ]
+    assert [name for page in beta for name, _ in page.fields] == [
         "beta (1/2)",
         "beta (2/2)",
     ]
-    for page in pages:
+    for page in (*alpha, *beta):
         for _, value in page.fields:
             assert len(value) <= help_module.MAX_FIELD_VALUE
         assert len(render(page)) <= help_module.MAX_EMBED_LENGTH
 
-    listing = " ".join(value for page in pages for _, value in page.fields)
+    listing = " ".join(value for page in (*alpha, *beta) for _, value in page.fields)
     assert listing.count("`command_") == 100, "no command may be dropped"
 
 
 @pytest.mark.asyncio
-async def test_commands_blocked_by_cog_check_are_absent():
+async def test_commands_blocked_by_cog_check_have_no_page():
     context = make_context(
         {
             "debug": make_cog("debug", ["reload", "sessions"], allowed=False),
@@ -288,17 +251,15 @@ async def test_commands_blocked_by_cog_check_are_absent():
         }
     )
 
-    pages = await help_module.build_help_pages(context)
-
-    assert [page.cogs for page in pages] == [("core",)]
-    assert "reload" not in " ".join(value for _, value in pages[0].fields)
+    assert await help_module.build_cog_pages(context, "!", "debug") == []
+    assert await help_module.build_cog_pages(context, "!", "core") != []
 
 
 @pytest.mark.asyncio
-async def test_cog_jump_starts_on_the_page_holding_that_cog():
+async def test_a_cog_payload_opens_that_cog_page():
     context = make_context(
         {
-            name: make_cog(name, [f"{name}_cmd"])
+            name: make_cog(name, [f"{name}_cmd"], title=f"{name}.")
             for name in ("alpha", "beta", "gamma", "delta")
         }
     )
@@ -310,22 +271,73 @@ async def test_cog_jump_starts_on_the_page_holding_that_cog():
         payload={"index": 0, "cog": "delta"},
     )
 
-    assert session.index == 1
-    assert context.replies[-1].embed.footer.text == "Página 2/2"
+    embed = context.replies[-1].embed
+    assert session.index == 0
+    assert session.requested_cog == "delta"
+    assert embed.title == "delta."
+    assert embed.footer.text == "Página 1/1"
+    assert embed.fields[0].name == "delta."
+    assert embed.fields[0].value == "`delta_cmd`"
 
 
 @pytest.mark.asyncio
-async def test_start_without_a_cog_opens_the_first_page():
-    context = make_context({"core": make_cog("core", ["ping"])})
+async def test_start_without_a_cog_opens_the_index():
+    context = make_context({"core": make_cog("core", ["ping"], title=":brain:Core.")})
     register(context)
 
     session = await context.bot.sessions.start(
         help_module.HELP_PAGES, event(context), payload={"index": 0}
     )
 
+    embed = context.replies[-1].embed
     assert session.index == 0
+    assert session.requested_cog == ""
+    assert embed.title == help_module.PAGE_TITLE
+    assert ":brain:Core. — 1 comando · `!help core`" in embed.description
+    assert embed.fields == []
+    # The index is a menu, not a numbered listing.
+    assert embed.footer.text is None
     assert context.replies[-1].view is not None
-    assert context.replies[-1].embed.footer.text == "Página 1/1"
+
+
+@pytest.mark.asyncio
+async def test_show_index_returns_to_the_index_in_place():
+    context = make_context(
+        {
+            "alpha": make_cog("alpha", ["alpha_cmd"], title="alpha."),
+            "beta": make_cog("beta", ["beta_cmd"], title="beta."),
+        }
+    )
+    register(context)
+
+    session = await context.bot.sessions.start(
+        help_module.HELP_PAGES,
+        event(context),
+        payload={"index": 0, "cog": "alpha"},
+    )
+    assert session.requested_cog == "alpha"
+
+    await session.show_index(event(context))
+
+    assert session.closed is False
+    assert session.requested_cog == ""
+    assert session.index == 0
+    embed = context.replies[-1].embed
+    assert embed.title == help_module.PAGE_TITLE
+    assert "beta." in embed.description
+    assert embed.footer.text is None
+
+
+def test_session_exposes_a_categorias_action():
+    context = make_context({"core": make_cog("core", ["ping"])})
+    registered = registration()
+    session = registered.session_class(registered, event(context))
+
+    assert [action.label for action in session.actions] == [
+        "Anterior",
+        "Próximo",
+        "Categorias",
+    ]
 
 
 @pytest.mark.asyncio
@@ -490,8 +502,9 @@ async def test_cog_pages_ignore_the_three_cog_page_cap():
     assert page.title == ":alpha:Alpha."
     assert page.cogs == ("alpha",)
     assert page.description == "!help comando para detalhes"
-    # Continuation fields are allowed to exceed the cogs-per-page count.
-    assert len(page.fields) > help_module.COGS_PER_PAGE
+    # 120 commands no longer fit one 1024-char value: the cog spills into
+    # continuation fields on the same page instead of being capped.
+    assert len(page.fields) >= 4
     assert len(page.fields) <= help_module.MAX_FIELDS_PER_PAGE
     listing = " ".join(value for _, value in page.fields)
     assert listing.count("`command_") == 120

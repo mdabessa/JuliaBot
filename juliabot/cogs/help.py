@@ -1,14 +1,11 @@
 """Help command cog with a paginated command listing.
 
-``!help`` renders the compact listing (dense command names grouped by cog) as
-one embed per page of three cogs, so the menu never grows past Discord's embed
-limits. Pages are computed once against the invoking context and the session
-only navigates them. ``!help <command>`` keeps the one-shot detail embed.
-
-:func:`build_help_index` and :func:`build_cog_pages` describe the two-level
-layout the session moves to next: a one-embed category index and the command
-grid of a single cog. :func:`build_help_pages` still backs the live session
-until that wiring lands.
+``!help`` opens a one-embed category index: one line per cog, with a count and
+the ``!help <cog>`` that opens it. Choosing a category renders that cog's
+compact command grid (dense command names, grouped by cog) across as many pages
+as its embed budget needs. Pages are computed once against the invoking context
+and the session only navigates them. ``!help <command>`` keeps the one-shot
+detail embed.
 """
 
 import logging
@@ -20,6 +17,7 @@ from discord.ext import commands
 
 from ..client import Client
 from ..sessions import (
+    Action,
     InteractionEvent,
     Registration,
     Registry,
@@ -34,15 +32,13 @@ logger = logging.getLogger(__name__)
 HELP_PAGES = "help.pages"
 
 PAGE_TITLE = "Lista de Comandos"
-COGS_PER_PAGE = 3
 MAX_FIELDS_PER_PAGE = 25
 MAX_FIELD_VALUE = 1024
 MAX_DESCRIPTION = 4096
 MAX_EMBED_LENGTH = 6000
-# Title, description, footer, and padding fields are reserved up front so cogs
-# can be packed against one value budget without re-measuring the whole embed.
+# Title, description, and footer are reserved up front so a cog's fields can be
+# packed against one value budget without re-measuring the whole embed.
 EMBED_OVERHEAD = 256
-PADDING_FIELD = ("** **", "** **")
 
 # Page kinds: the index lists categories, a commands page lists one cog's grid.
 PAGE_KIND_INDEX = "index"
@@ -149,70 +145,6 @@ async def _visible_commands(
     return visible
 
 
-def _chunk_cogs(
-    fields: list[tuple[str, str]], cogs: list[str]
-) -> list[tuple[tuple[tuple[str, str], ...], tuple[str, ...]]]:
-    """Pack cog fields into page chunks that respect every embed budget.
-
-    A page holds at most ``COGS_PER_PAGE`` field slots, so a cog whose value
-    would overflow the total character budget lands on a page of its own
-    instead of shrinking the page size for every cog. A cog that spilled into
-    continuation fields can therefore occupy more than one slot.
-    """
-    char_budget = MAX_EMBED_LENGTH - EMBED_OVERHEAD
-    chunks: list[tuple[tuple[tuple[str, str], ...], tuple[str, ...]]] = []
-    current_fields: list[tuple[str, str]] = []
-    current_cogs: list[str] = []
-    used = 0
-
-    for field, cog_name in zip(fields, cogs):
-        cost = len(field[0]) + len(field[1])
-        full = len(current_fields) >= min(COGS_PER_PAGE, MAX_FIELDS_PER_PAGE)
-        too_big = used + cost > char_budget
-        if current_fields and (full or too_big):
-            chunks.append((tuple(current_fields), tuple(current_cogs)))
-            current_fields, current_cogs, used = [], [], 0
-        current_fields.append(field)
-        current_cogs.append(cog_name)
-        used += cost
-
-    if current_fields:
-        chunks.append((tuple(current_fields), tuple(current_cogs)))
-    return chunks
-
-
-async def build_help_pages(ctx: commands.Context, prefix: str = "!") -> list[HelpPage]:
-    """Build the pre-rendered help pages for the invoking context."""
-    description = f"{prefix}help comando | {prefix}help !categoria"
-    bot = getattr(ctx, "bot", None)
-    cogs = getattr(bot, "cogs", {}) or {}
-
-    fields: list[tuple[str, str]] = []
-    names: list[str] = []
-    for cog_name, cog in cogs.items():
-        commands_in_cog = await _visible_commands(cog, ctx)
-        if not commands_in_cog:
-            continue
-        tokens = [_command_label(command) for command in commands_in_cog]
-        for field in _cog_fields(_cog_title(cog, cog_name), tokens):
-            fields.append(field)
-            names.append(cog_name)
-
-    pages: list[HelpPage] = []
-    for chunk_fields, chunk_cogs in _chunk_cogs(fields, names):
-        padded = list(chunk_fields)
-        padded.extend([PADDING_FIELD] * ((-len(padded)) % COGS_PER_PAGE))
-        pages.append(
-            HelpPage(
-                title=PAGE_TITLE,
-                description=description,
-                fields=tuple(padded),
-                cogs=chunk_cogs,
-            )
-        )
-    return pages
-
-
 def _section_of(cog: commands.Cog) -> str:
     """Return the index section a cog belongs to, defaulting to the main one.
 
@@ -232,11 +164,11 @@ def _count_label(amount: int) -> str:
 def _chunk_fields(
     fields: list[tuple[str, str]], max_fields: int
 ) -> list[tuple[tuple[str, str], ...]]:
-    """Pack one cog's fields into pages, ignoring the cog-count cap.
+    """Pack one cog's fields into pages sized by Discord's embed budgets.
 
-    A category page holds a single cog, so only Discord's per-value and total
-    embed budgets bound it; ``COGS_PER_PAGE`` applies to the flat listing and
-    must never be the reason a cog is split.
+    A category page holds a single cog, so only the per-value and total embed
+    budgets bound it: the page never splits because of how many other cogs
+    exist.
     """
     char_budget = MAX_EMBED_LENGTH - EMBED_OVERHEAD
     pages: list[tuple[tuple[str, str], ...]] = []
@@ -416,7 +348,11 @@ async def resolve_prefix(context) -> str:
 
 
 class HelpPagination(PaginationSession[HelpPage]):
-    """Navigate the pre-built help pages of one channel."""
+    """Navigate the help levels of one channel: the index, or one cog's grid."""
+
+    extra_actions = (
+        Action("index", "show_index", owner_only=False, label="Categorias"),
+    )
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -450,24 +386,47 @@ class HelpPagination(PaginationSession[HelpPage]):
         self._color = getattr(bot, "color", 0)
 
     async def load_items(self) -> list[HelpPage]:
-        """Build the pages once and resolve any requested cog jump."""
-        pages = await build_help_pages(
-            self._context, await resolve_prefix(self._context)
-        )
+        """Build the pages of the current level: the index or one cog's grid.
+
+        The ``cog`` payload key doubles as the level selector: empty renders the
+        category index, a cog name renders that cog's command pages.
+        """
+        prefix = await resolve_prefix(self._context)
         cog_name = self.requested_cog
-        if cog_name:
-            for position, page in enumerate(pages):
-                if cog_name in page.cogs:
-                    self.set_payload("index", position)
-                    break
-        return pages
+        if not cog_name:
+            return await build_help_index(self._context, prefix)
+        return await build_cog_pages(self._context, prefix, cog_name)
+
+    async def show_index(self, event: InteractionEvent) -> None:
+        """Return to the category index without leaving the session.
+
+        Switching level in place is what keeps the index reachable: starting a
+        second session would trip ``max_per_scope=1`` and drop the one on
+        screen, leaving only a dead message behind.
+        """
+        if not self.requested_cog:
+            await self.render()
+            return
+        self.set_payload("cog", "")
+        self.set_payload("index", 0)
+        await self._reload()
+
+    async def _reload(self) -> None:
+        """Rebuild the items after a level switch and redraw the page."""
+        self._items = list(await self.load_items())
+        if not self._items:
+            await self.close()
+            return
+        self.set_payload("index", self._normalise_index(self.index))
+        await self.render()
 
     async def render_item(self, item: HelpPage, index: int, total: int):
-        """Render one page with the compact dense field layout."""
+        """Render one page: a category menu, or a numbered command listing."""
         embed = Embed(title=item.title, description=item.description, color=self._color)
         for name, value in item.fields:
             embed.add_field(name=name, value=value, inline=True)
-        embed.set_footer(text=f"Página {index + 1}/{total}")
+        if item.kind != PAGE_KIND_INDEX:
+            embed.set_footer(text=f"Página {index + 1}/{total}")
         return embed
 
 
@@ -531,7 +490,7 @@ class HelpCog(commands.Cog, name="help"):
     async def _start_pages(
         self, ctx: commands.Context, cog_name: Optional[str] = None
     ) -> None:
-        """Start the paginated listing, optionally on a cog's page."""
+        """Start the session, on the index or on one cog's level."""
         payload = {"index": 0}
         if cog_name:
             payload["cog"] = cog_name
@@ -539,7 +498,14 @@ class HelpCog(commands.Cog, name="help"):
             HELP_PAGES, self._session_event(ctx), payload=payload
         )
         if session.closed:
-            await ctx.send("Nenhum comando disponível.")
+            # A category can close on start when every command in it is
+            # hidden or fails ``can_run``; say which one, not just "nothing".
+            reason = (
+                f"Nenhum comando disponível em `{cog_name}`."
+                if cog_name
+                else "Nenhum comando disponível."
+            )
+            await ctx.send(reason)
 
     @commands.command(brief="Ajuda", aliases=["ajuda"])
     async def help(self, ctx: commands.Context, argument: Optional[str] = None):

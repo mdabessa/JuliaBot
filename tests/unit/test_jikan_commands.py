@@ -480,9 +480,16 @@ async def test_help_lists_every_visible_generated_command_within_budget():
             self.bot = bot
 
     try:
-        pages = await help_module.build_help_pages(HelpContext(), "!")
+        ctx = HelpContext()
+        index = await help_module.build_help_index(ctx, "!")
+        pages = [
+            page
+            for cog_name in ("anime_api", "manga", "mal")
+            for page in await help_module.build_cog_pages(ctx, "!", cog_name)
+        ]
 
-        assert pages
+        assert index, "the index must name the generated cogs"
+        assert pages, "each generated cog must expose its command page"
         listed = " ".join(value for page in pages for _name, value in page.fields)
         for spec in catalog.load_specs():
             if spec.curated or spec.hidden:
@@ -498,10 +505,11 @@ async def test_help_lists_every_visible_generated_command_within_budget():
             assert sum(len(name) + len(value) for name, value in page.fields) <= 6000
             assert all(len(value) <= 1024 for _name, value in page.fields)
 
-        titles = " ".join(name for page in pages for name, _value in page.fields)
-        assert "Animes (API)." in titles
-        assert ":books:Mangás." in titles
-        assert ":mag:MyAnimeList." in titles
+        description = index[0].description
+        assert len(description) <= help_module.MAX_DESCRIPTION
+        assert "Animes (API)." in description
+        assert ":books:Mangás." in description
+        assert ":mag:MyAnimeList." in description
     finally:
         for cog in cogs:
             await bot.remove_cog(cog.qualified_name)

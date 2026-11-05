@@ -853,17 +853,22 @@ async def _run_help_help(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> No
     message = ctx.reply_messages[-1]
     assert (
         message.embed.title == "Lista de Comandos"
-    ), "help::help should render the global help embed"
+    ), "help::help should render the category index"
     assert (
-        message.embed.footer.text == "Página 1/1"
-    ), "help::help should number the first help page"
+        message.embed.footer.text is None
+    ), "help::help should not number a single-page index"
     assert message.view is not None, "help::help should attach navigation buttons"
 
-    values = " ".join(field.value for field in message.embed.fields)
-    assert "`help` (ajuda)" in values, "help::help should list command aliases"
-    assert ":question:Help." in [
-        field.name for field in message.embed.fields
-    ], "help::help should title each field with its cog"
+    assert (
+        message.embed.fields == []
+    ), "help::help should render a description list, not a command grid"
+    description = message.embed.description
+    assert (
+        ":question:Help. — 1 comando · `!help help`" in description
+    ), "help::help should list each category with its command count"
+    assert (
+        ":brain:Core." in description
+    ), "help::help should list every cog the author can use"
 
 
 async def _run_help_help_cog_jump(
@@ -880,8 +885,11 @@ async def _run_help_help_cog_jump(
     assert len(sessions) == 1, "help::help should start one page session"
     assert sessions[0].registration.name == help_module.HELP_PAGES
     assert (
+        sessions[0].to_payload()["cog"] == "help"
+    ), "help::help !<cog> should open that cog's level"
+    assert (
         sessions[0].to_payload()["index"] == 0
-    ), "help::help !<cog> should open the page holding that cog"
+    ), "help::help !<cog> should open on its first page"
     assert ctx.reply_messages[-1].embed.fields[0].name == ":question:Help."
 
 

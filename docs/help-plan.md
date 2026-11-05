@@ -7,8 +7,8 @@ the listing is now drowned by the generated Jikan commands. This plan keeps the
 #7 rendering work intact and changes *what page 1 shows* and *how deep the listing
 goes*, so the help surface stops growing with the API surface.
 
-Status: **slices 1–2 implemented** (builders + session level switch). Slices 3–4
-pending.
+Status: **slices 1–3 implemented** (builders, session level switch, section
+grouping). Slice 4 (fuzzy fallback) pending.
 
 ---
 
@@ -227,8 +227,9 @@ Each slice leaves the bot runnable and `pytest` green.
    through `_reload()`, and `Categorias` is an `extra_action`. The flat
    `build_help_pages` / `_chunk_cogs` / `PADDING_FIELD` / `COGS_PER_PAGE` path is
    gone, along with the tests that pinned its three-cog grid.
-3. **Section grouping.** Add `help_section = "API do MyAnimeList"` to
-   `GeneratedRoutesCog` and group the index by `getattr(cog, "help_section", "")`.
+3. ✅ **Section grouping — done.** `help_section = "API do MyAnimeList"` on
+   `GeneratedRoutesCog`, read by the index through
+   `getattr(cog, "help_section", "")`.
 4. **Fuzzy fallback.** Add `_suggestions` and wire the miss branch.
 
 ---
@@ -240,7 +241,7 @@ Each slice leaves the bot runnable and `pytest` green.
 | `tests/unit/test_help_pages.py` | `build_help_pages` disappears. Rewrite around `build_help_index` / `build_cog_pages`. Keep the budget tests (30-command cog, 26 cogs, "no command may be dropped") but retarget them at per-cog pages. The `PADDING_FIELD` / `% 3` assertions move to level 2 only. |
 | `tests/unit/test_cog_commands.py::_run_help_help` | Currently asserts `field.name` contains `":question:Help."` and `field.value` contains `` `help` (ajuda) `` on page 1. Level 1 is now a description list, so this case asserts the index lists both cogs with counts and keeps `embed.title == "Lista de Comandos"`; the alias assertion moves to a per-cog case. |
 | `tests/unit/test_cog_commands.py::_run_help_help_cog_jump` | Still valid (`payload["index"] == 0`, first field is the cog's title) — the embed title assertion needs to become the cog title. |
-| `tests/unit/test_jikan_commands.py::test_help_lists_every_visible_generated_command_within_budget` | Today it concatenates `build_help_pages` fields. Change to: the index lists the three generated cog lines under the API section, then concatenate `build_cog_pages` for `anime_api`, `manga`, `mal` and assert every non-`hidden`, non-`curated` spec still appears and every hidden one does not. |
+| `tests/unit/test_jikan_commands.py::test_help_lists_every_visible_generated_command_within_budget` | Rewritten: the index must name the three generated cogs under `**API do MyAnimeList**` with no `**Comandos**` block, and `build_cog_pages` for `anime_api`, `manga` and `mal` must still list every non-`hidden`, non-`curated` spec while omitting every hidden one. |
 | New cases — builder (slice 1, shipped) | `test_index_lists_each_cog_with_a_count_and_an_invocation`; `test_index_omits_cogs_the_invoker_cannot_use`; `test_index_puts_sectioned_cogs_after_the_main_block`; `test_index_stays_one_embed_for_many_cogs`; `test_index_spills_into_numbered_pages_past_the_description_limit`; `test_cog_pages_ignore_the_three_cog_page_cap`; `test_cog_pages_skip_hidden_commands`; `test_cog_pages_for_an_unknown_or_empty_cog_are_empty`. |
 | New cases — session / command (slices 2 and 4, pending) | `test_show_index_returns_to_level_one`; `test_unknown_argument_suggests_close_matches`; `test_unknown_argument_without_matches_keeps_the_plain_message`. |
 

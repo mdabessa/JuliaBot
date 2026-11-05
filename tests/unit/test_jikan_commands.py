@@ -510,6 +510,13 @@ async def test_help_lists_every_visible_generated_command_within_budget():
         assert "Animes (API)." in description
         assert ":books:Mangás." in description
         assert ":mag:MyAnimeList." in description
+
+        # Generated cogs are grouped away from the hand-written commands, so
+        # the index never leads with the API surface.
+        api_section = "**API do MyAnimeList**"
+        assert api_section in description
+        assert description.index(api_section) < description.index("Animes (API).")
+        assert help_module.MAIN_SECTION_TITLE not in description
     finally:
         for cog in cogs:
             await bot.remove_cog(cog.qualified_name)

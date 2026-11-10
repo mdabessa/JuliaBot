@@ -21,6 +21,7 @@ JuliaBot is a Discord bot written in Python using the [discord.py](https://githu
     - `ANIME_SCRAP_TIME`: The time in seconds between each web scraping for new anime episodes. Defaults to `3600`
     - `BOT_JIKAN_RATE_LIMIT`: The rate limit per minute for the Jikan API to the bot. Defaults to `50`
     - `SCRAP_JIKAN_RATE_LIMIT`: The rate limit per minute for the Jikan API to the web scraper. Defaults to `10`
+    - `NEXTCLOUD_URL`, `NEXTCLOUD_USER`, `NEXTCLOUD_APP_PASSWORD`, `NEXTCLOUD_CALENDAR`, `REMINDER_CALENDAR_USER_ID`: mirror one-shot reminders into an existing Nextcloud calendar. The mirror stays off unless all of them are set
 5. Run the bot using `python -m juliabot`
 
 ## Commands

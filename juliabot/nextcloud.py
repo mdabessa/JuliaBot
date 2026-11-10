@@ -1,8 +1,16 @@
-"""Build iCalendar events for one-shot Discord reminders.
+"""Mirror one-shot Discord reminders into an existing Nextcloud calendar.
 
-The builder is pure: every value it needs is an argument, so the output is
-deterministic and testable without a clock, a network or a database. Only the
-CalDAV transport uses it.
+The module has three layers:
+
+* a pure iCalendar builder (``build_event``, ``escape_text``, ``fold_line``)
+  that needs no clock, network or database;
+* ``NextcloudConfig``, which is only built when every ``NEXTCLOUD_*`` setting
+  is present, and therefore doubles as the feature flag;
+* ``CalendarClient``, a thin CalDAV transport that resolves a calendar by
+  display name and writes events into it.
+
+The calendar is never read back: Discord remains the only place a reminder is
+created, delivered and removed.
 
 Event shape (RFC 5545)::
 
@@ -24,7 +32,22 @@ There is no ``DTEND`` (the event marks a moment, not a busy block), no
 
 from __future__ import annotations
 
+import asyncio
+import base64
+import logging
+import os
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import NamedTuple
+from urllib.parse import quote
+from xml.etree import ElementTree
+
+import aiohttp
+
+logger = logging.getLogger(__name__)
+
+DAV_NAMESPACE = "{DAV:}"
+CALDAV_NAMESPACE = "{urn:ietf:params:xml:ns:caldav}"
 
 PRODID = "-//JuliaBot//reminder//EN"
 
@@ -35,6 +58,62 @@ MAX_LINE_OCTETS = 75
 MAX_SUMMARY_LENGTH = 120
 
 CRLF = "\r\n"
+
+#: Every one of these must be set for the mirror to be enabled.
+ENV_URL = "NEXTCLOUD_URL"
+ENV_USER = "NEXTCLOUD_USER"
+ENV_APP_PASSWORD = "NEXTCLOUD_APP_PASSWORD"
+ENV_CALENDAR = "NEXTCLOUD_CALENDAR"
+ENV_REMINDER_USER_ID = "REMINDER_CALENDAR_USER_ID"
+
+SETTING_NAMES = (
+    ENV_URL,
+    ENV_USER,
+    ENV_APP_PASSWORD,
+    ENV_CALENDAR,
+    ENV_REMINDER_USER_ID,
+)
+
+
+@dataclass(frozen=True)
+class NextcloudConfig:
+    """Settings for mirroring reminders into an existing Nextcloud calendar.
+
+    The configuration exists only when every setting is present, so its
+    presence is the feature flag: ``None`` from :meth:`from_env` means the
+    mirror is off and no reminder touches the network.
+    """
+
+    url: str
+    user: str
+    app_password: str
+    calendar: str
+    reminder_user_id: str
+
+    @classmethod
+    def from_env(cls) -> NextcloudConfig | None:
+        """Read the settings from the environment.
+
+        Returns:
+            NextcloudConfig | None: The configuration, or None when any
+            setting is missing or blank.
+        """
+        values = {name: (os.environ.get(name) or "").strip() for name in SETTING_NAMES}
+        if not all(values.values()):
+            return None
+
+        return cls(
+            url=values[ENV_URL].rstrip("/"),
+            user=values[ENV_USER],
+            app_password=values[ENV_APP_PASSWORD],
+            calendar=values[ENV_CALENDAR],
+            reminder_user_id=values[ENV_REMINDER_USER_ID],
+        )
+
+    @property
+    def calendars_url(self) -> str:
+        """Return the CalDAV collection that holds the user's calendars."""
+        return f"{self.url}/remote.php/dav/calendars/{quote(self.user, safe='')}/"
 
 
 def escape_text(value: str) -> str:
@@ -149,3 +228,227 @@ def _format_utc(value: datetime) -> str:
         value = value.replace(tzinfo=timezone.utc)
 
     return value.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _basic_auth(user: str, app_password: str) -> str:
+    """Build the ``Authorization`` header value for an app password."""
+    token = base64.b64encode(f"{user}:{app_password}".encode("utf-8")).decode("ascii")
+
+    return f"Basic {token}"
+
+
+class NextcloudError(RuntimeError):
+    """Raised when Nextcloud answers a calendar operation unexpectedly."""
+
+
+class CalendarCollection(NamedTuple):
+    """One calendar advertised by a CalDAV ``PROPFIND``."""
+
+    href: str
+    name: str
+
+
+PROPFIND_BODY = (
+    '<?xml version="1.0" encoding="utf-8"?>'
+    '<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
+    "<d:prop><d:displayname/><d:resourcetype/></d:prop>"
+    "</d:propfind>"
+)
+
+
+def parse_calendar_list(body: bytes) -> list[CalendarCollection]:
+    """Extract the calendars from a CalDAV multistatus document.
+
+    Collections whose ``resourcetype`` is not a CalDAV calendar (address books,
+    or the parent collection itself) are ignored.
+
+    Args:
+        body (bytes): Raw ``PROPFIND`` response body.
+
+    Returns:
+        list[CalendarCollection]: Calendars with their href and display name.
+    """
+    root = ElementTree.fromstring(body)
+    calendars: list[CalendarCollection] = []
+
+    for response in root.iter(f"{DAV_NAMESPACE}response"):
+        href = (response.findtext(f"{DAV_NAMESPACE}href") or "").strip()
+        if not href:
+            continue
+
+        for propstat in response.findall(f"{DAV_NAMESPACE}propstat"):
+            prop = propstat.find(f"{DAV_NAMESPACE}prop")
+            if prop is None:
+                continue
+            if (
+                prop.find(f"{DAV_NAMESPACE}resourcetype/{CALDAV_NAMESPACE}calendar")
+                is None
+            ):
+                continue
+
+            name = (prop.findtext(f"{DAV_NAMESPACE}displayname") or "").strip()
+            calendars.append(CalendarCollection(href, name))
+
+    return calendars
+
+
+class CalendarClient:
+    """Resolve the configured calendar and write reminder events into it.
+
+    The HTTP session is injected (``aiohttp.ClientSession`` or a fake), so no
+    test has to touch the network. The resolved href is cached for the process
+    lifetime; credentials are never logged.
+    """
+
+    def __init__(
+        self,
+        session: aiohttp.ClientSession,
+        config: NextcloudConfig,
+        *,
+        timeout: float = 5.0,
+    ) -> None:
+        self._session = session
+        self._config = config
+        self._timeout = timeout
+        self._auth_headers = {
+            "Authorization": _basic_auth(config.user, config.app_password)
+        }
+        self._calendar_url: str | None = None
+        self._unresolvable = False
+
+    async def resolve_calendar(self) -> str | None:
+        """Return the absolute URL of the configured calendar.
+
+        The href is cached for the process lifetime. A calendar name that is
+        missing or matches more than once disables the mirror instead of
+        guessing; a transient failure is retried on the next call.
+
+        Returns:
+            str | None: The calendar URL, or None when it cannot be resolved.
+        """
+        if self._calendar_url is not None:
+            return self._calendar_url
+        if self._unresolvable:
+            return None
+
+        try:
+            calendars = await self._list_calendars()
+        except (
+            asyncio.TimeoutError,
+            aiohttp.ClientError,
+            NextcloudError,
+            ElementTree.ParseError,
+        ) as error:
+            logger.warning("Could not list Nextcloud calendars: %s", error)
+            return None
+
+        url = self._select_calendar(calendars)
+        if url is None:
+            return None
+
+        self._calendar_url = url
+        logger.info(
+            "Mirroring reminders into Nextcloud calendar %r at %s",
+            self._config.calendar,
+            self._config.url,
+        )
+        return url
+
+    async def put_event(self, uid: str, ics: str) -> bool:
+        """Store one event, leaving an existing event with the same UID alone.
+
+        Args:
+            uid (str): Event identifier; it names the ``.ics`` resource.
+            ics (str): The full VCALENDAR document.
+
+        Returns:
+            bool: True when the calendar holds the event afterwards, False
+            when the calendar could not be resolved.
+
+        Raises:
+            NextcloudError: When the server rejects the request.
+        """
+        calendar_url = await self.resolve_calendar()
+        if calendar_url is None:
+            return False
+
+        url = f"{calendar_url}{quote(uid, safe='')}.ics"
+        status, _body = await self._send(
+            "PUT",
+            url,
+            headers={
+                "Content-Type": "text/calendar; charset=utf-8",
+                "If-None-Match": "*",
+            },
+            data=ics.encode("utf-8"),
+        )
+
+        if status == 412:
+            logger.info("Reminder event %s is already stored; leaving it as is", uid)
+            return True
+        if status >= 400:
+            raise NextcloudError(f"storing event {uid} returned HTTP {status}")
+
+        return True
+
+    async def _list_calendars(self) -> list[CalendarCollection]:
+        status, body = await self._send(
+            "PROPFIND",
+            self._config.calendars_url,
+            headers={
+                "Depth": "1",
+                "Content-Type": "application/xml; charset=utf-8",
+            },
+            data=PROPFIND_BODY.encode("utf-8"),
+        )
+        if status != 207:
+            raise NextcloudError(f"listing calendars returned HTTP {status}")
+
+        return parse_calendar_list(body)
+
+    async def _send(self, method: str, url: str, **kwargs) -> tuple[int, bytes]:
+        headers = {**self._auth_headers, **kwargs.pop("headers", {})}
+        timeout = aiohttp.ClientTimeout(total=self._timeout)
+        async with self._session.request(
+            method, url, headers=headers, timeout=timeout, **kwargs
+        ) as response:
+            return response.status, await response.read()
+
+    def _select_calendar(self, calendars: list[CalendarCollection]) -> str | None:
+        wanted = self._config.calendar
+        exact = [calendar for calendar in calendars if calendar.name == wanted]
+        matches = exact or [
+            calendar
+            for calendar in calendars
+            if calendar.name.casefold() == wanted.casefold()
+        ]
+
+        if len(matches) == 1:
+            return self._absolute(matches[0].href)
+
+        self._unresolvable = True
+        if matches:
+            logger.warning(
+                "%d Nextcloud calendars are named %r; refusing to guess. "
+                "The reminder mirror is disabled.",
+                len(matches),
+                wanted,
+            )
+        else:
+            available = ", ".join(sorted(c.name for c in calendars)) or "none"
+            logger.warning(
+                "No Nextcloud calendar is named %r; available: %s. "
+                "The reminder mirror is disabled.",
+                wanted,
+                available,
+            )
+
+        return None
+
+    def _absolute(self, href: str) -> str:
+        if href.startswith(("http://", "https://")):
+            url = href
+        else:
+            url = f"{self._config.url}{href}"
+
+        return url if url.endswith("/") else f"{url}/"

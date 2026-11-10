@@ -272,7 +272,7 @@ class Reminder(Model):
     message_id = Column(String, nullable=False)
     user_id = Column(String, nullable=False)
     time_created = Column(DateTime(timezone=True), server_default=func.now())
-    time_reminder = Column(DateTime, nullable=False)
+    time_reminder = Column(DateTime(timezone=True), nullable=False)
     date_command = Column(String, default=None)
 
     def __init__(

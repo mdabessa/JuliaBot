@@ -5,6 +5,13 @@ from sqlalchemy import Column, Integer, MetaData, String, Table
 import juliabot.models as models
 
 
+def test_reminder_time_columns_are_timezone_aware():
+    table = models.Reminder.__table__
+
+    assert table.c.time_reminder.type.timezone is True
+    assert table.c.time_created.type.timezone is True
+
+
 def test_is_simple_auto_add_column_allows_basic_nullable_column():
     column = Column("extra", String, nullable=True)
 

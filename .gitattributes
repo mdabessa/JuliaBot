@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# The iCalendar fixture is compared byte-for-byte, CRLF included.
+tests/golden/*.ics text eol=crlf

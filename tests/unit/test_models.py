@@ -88,6 +88,26 @@ def test_reminder_time_round_trips_as_the_same_instant(reminder_tables):
     assert models.as_utc(stored_value) == expected
 
 
+def _freeze_clock(monkeypatch, frozen: datetime.datetime):
+    monkeypatch.setattr(models, "datetime", SimpleNamespace(now=lambda tz=None: frozen))
+
+
+def test_get_expired_compares_against_an_explicit_utc_now(monkeypatch, reminder_tables):
+    now = datetime.datetime(2025, 3, 8, 12, 0, tzinfo=pytz.utc)
+    _freeze_clock(monkeypatch, now)
+    server = models.Server.get_or_create(GUILD_ID)
+    server.set_timezone(SAO_PAULO)
+
+    past = _make_reminder(now - datetime.timedelta(minutes=1))
+    current_minute = _make_reminder(now.replace(second=0, microsecond=0))
+    future = _make_reminder(now + datetime.timedelta(minutes=1))
+
+    expired = {reminder.id for reminder in models.Reminder.get_expired()}
+
+    assert expired == {past.id, current_minute.id}
+    assert future.id not in expired
+
+
 def test_reminder_time_columns_are_timezone_aware():
     table = models.Reminder.__table__
 

@@ -356,11 +356,14 @@ class Reminder(Model):
     def get_expired(cls) -> List[Reminder]:
         """Fetch all reminders past their trigger time.
 
+        Both sides of the comparison are absolute: ``now`` is aware UTC and the
+        query sends it as UTC, so the result never depends on the host or the
+        database session timezone.
+
         Returns:
             List[Reminder]: Expired reminders ready to be triggered.
         """
-        now = datetime.now()
-        now = now.astimezone(pytz.utc)
+        now = datetime.now(pytz.utc)
         now = now.replace(second=59, microsecond=999999)
         return session.query(cls).filter(cls.time_reminder <= now).all()
 

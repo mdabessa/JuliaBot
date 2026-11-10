@@ -8,7 +8,7 @@ import pytz
 from discord import Embed
 
 from ..converters import DeltaToDate
-from ..models import Reminder
+from ..models import Reminder, as_utc
 
 
 async def reminder_embed(reminder: Reminder, bot) -> Embed:
@@ -44,7 +44,7 @@ async def reminder_embed(reminder: Reminder, bot) -> Embed:
     if reminder.date_command is not None:
         embed.add_field(name="Comando:", value=reminder.date_command, inline=False)
         next_reminder = await DeltaToDate.convert(
-            None, None, reminder.date_command, start=reminder.time_reminder
+            None, None, reminder.date_command, start=as_utc(reminder.time_reminder)
         )
 
         timezone = pytz.utc
@@ -52,7 +52,7 @@ async def reminder_embed(reminder: Reminder, bot) -> Embed:
             server = reminder.get_server()
             timezone = server.get_timezone()
 
-        next_reminder = next_reminder.astimezone(timezone)
+        next_reminder = as_utc(next_reminder).astimezone(timezone)
         next_reminder = next_reminder.strftime("%d/%m/%Y %H:%M")
         next_reminder += f" [{timezone.zone}]"
 

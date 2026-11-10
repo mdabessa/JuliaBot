@@ -42,6 +42,25 @@ logger = logging.getLogger(__name__)
 MIGRATION_MANAGED_TABLES = frozenset({"session"})
 
 
+def as_utc(value: datetime) -> datetime:
+    """Interpret a database timestamp as an absolute UTC instant.
+
+    PostgreSQL returns aware values for ``TIMESTAMP WITH TIME ZONE`` columns,
+    while SQLite and legacy data drop the offset and return naive ones. A naive
+    value is always UTC, never the host's local time.
+
+    Args:
+        value (datetime): Timestamp read from the database.
+
+    Returns:
+        datetime: The same instant as an aware UTC datetime.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=pytz.utc)
+
+    return value.astimezone(pytz.utc)
+
+
 class Model(Base):
     """Abstract base model for all database entities.
 
@@ -312,7 +331,7 @@ class Reminder(Model):
         if server:
             timezone = server.get_timezone()
 
-        date = self.time_reminder.astimezone(timezone)
+        date = as_utc(self.time_reminder).astimezone(timezone)
         date = date.strftime("%d/%m/%Y %H:%M")
 
         return date + f" [{timezone.zone}]"
@@ -328,7 +347,7 @@ class Reminder(Model):
         if server:
             timezone = server.get_timezone()
 
-        date = self.time_created.astimezone(timezone)
+        date = as_utc(self.time_created).astimezone(timezone)
         date = date.strftime("%d/%m/%Y %H:%M")
 
         return date + f" [{timezone.zone}]"

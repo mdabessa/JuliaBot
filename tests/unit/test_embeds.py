@@ -71,6 +71,36 @@ async def test_reminder_embed_without_recurrence():
 
 
 @pytest.mark.asyncio
+async def test_reminder_embed_treats_naive_reminder_times_as_utc(monkeypatch):
+    sao_paulo = pytz.timezone("America/Sao_Paulo")
+    naive_utc = datetime.datetime(2025, 3, 8, 12, 0)
+    expected_start = datetime.datetime(2025, 3, 8, 12, 0, tzinfo=pytz.utc)
+
+    async def fake_convert(*args, **kwargs):
+        assert kwargs["start"] == expected_start
+        return kwargs["start"] + datetime.timedelta(days=1)
+
+    monkeypatch.setattr("juliabot.embeds.reminder.DeltaToDate.convert", fake_convert)
+
+    server = SimpleNamespace(get_timezone=lambda: sao_paulo)
+    reminder = SimpleNamespace(
+        channel_id="999",
+        server_id="1",
+        date_command="1d",
+        time_reminder=naive_utc,
+        get_date_str=lambda: "08/03/2025 09:00 [America/Sao_Paulo]",
+        get_created_str=lambda: "08/03/2025 09:00 [America/Sao_Paulo]",
+        get_server=lambda: server,
+    )
+    bot = SimpleNamespace(color=0xABCDEF, get_channel=lambda _id: None)
+
+    embed = await reminder_embed(reminder, bot)
+
+    next_field = next(f for f in embed.fields if f.name.startswith("Pr"))
+    assert next_field.value == "09/03/2025 09:00 [America/Sao_Paulo]"
+
+
+@pytest.mark.asyncio
 async def test_reminder_embed_with_recurrence(monkeypatch):
     base_time = datetime.datetime(2025, 1, 1, 10, 0, tzinfo=pytz.utc)
 

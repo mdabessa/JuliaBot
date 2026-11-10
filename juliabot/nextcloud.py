@@ -1,8 +1,16 @@
-"""Build iCalendar events for one-shot Discord reminders.
+"""Mirror one-shot Discord reminders into an existing Nextcloud calendar.
 
-The builder is pure: every value it needs is an argument, so the output is
-deterministic and testable without a clock, a network or a database. Only the
-CalDAV transport uses it.
+The module has three layers:
+
+* a pure iCalendar builder (``build_event``, ``escape_text``, ``fold_line``)
+  that needs no clock, network or database;
+* ``NextcloudConfig``, which is only built when every ``NEXTCLOUD_*`` setting
+  is present, and therefore doubles as the feature flag;
+* ``CalendarClient``, a thin CalDAV transport that resolves a calendar by
+  display name and writes events into it.
+
+The calendar is never read back: Discord remains the only place a reminder is
+created, delivered and removed.
 
 Event shape (RFC 5545)::
 
@@ -24,7 +32,10 @@ There is no ``DTEND`` (the event marks a moment, not a busy block), no
 
 from __future__ import annotations
 
+import os
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 PRODID = "-//JuliaBot//reminder//EN"
 
@@ -35,6 +46,62 @@ MAX_LINE_OCTETS = 75
 MAX_SUMMARY_LENGTH = 120
 
 CRLF = "\r\n"
+
+#: Every one of these must be set for the mirror to be enabled.
+ENV_URL = "NEXTCLOUD_URL"
+ENV_USER = "NEXTCLOUD_USER"
+ENV_APP_PASSWORD = "NEXTCLOUD_APP_PASSWORD"
+ENV_CALENDAR = "NEXTCLOUD_CALENDAR"
+ENV_REMINDER_USER_ID = "REMINDER_CALENDAR_USER_ID"
+
+SETTING_NAMES = (
+    ENV_URL,
+    ENV_USER,
+    ENV_APP_PASSWORD,
+    ENV_CALENDAR,
+    ENV_REMINDER_USER_ID,
+)
+
+
+@dataclass(frozen=True)
+class NextcloudConfig:
+    """Settings for mirroring reminders into an existing Nextcloud calendar.
+
+    The configuration exists only when every setting is present, so its
+    presence is the feature flag: ``None`` from :meth:`from_env` means the
+    mirror is off and no reminder touches the network.
+    """
+
+    url: str
+    user: str
+    app_password: str
+    calendar: str
+    reminder_user_id: str
+
+    @classmethod
+    def from_env(cls) -> NextcloudConfig | None:
+        """Read the settings from the environment.
+
+        Returns:
+            NextcloudConfig | None: The configuration, or None when any
+            setting is missing or blank.
+        """
+        values = {name: (os.environ.get(name) or "").strip() for name in SETTING_NAMES}
+        if not all(values.values()):
+            return None
+
+        return cls(
+            url=values[ENV_URL].rstrip("/"),
+            user=values[ENV_USER],
+            app_password=values[ENV_APP_PASSWORD],
+            calendar=values[ENV_CALENDAR],
+            reminder_user_id=values[ENV_REMINDER_USER_ID],
+        )
+
+    @property
+    def calendars_url(self) -> str:
+        """Return the CalDAV collection that holds the user's calendars."""
+        return f"{self.url}/remote.php/dav/calendars/{quote(self.user, safe='')}/"
 
 
 def escape_text(value: str) -> str:

@@ -6,6 +6,7 @@ import pytz
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import datetime
+from types import SimpleNamespace
 
 import pytest
 
@@ -239,3 +240,23 @@ async def test_next_date_monthly_recurrence_hops_one_month_at_a_time(delta, day)
         )
 
         date = next_date
+
+
+@pytest.mark.asyncio
+async def test_date_converter_falls_back_to_utc_without_a_server_row(monkeypatch):
+    monkeypatch.setattr("juliabot.converters.Server.get", lambda server_id: None)
+    ctx = SimpleNamespace(guild=SimpleNamespace(id=10))
+
+    converted = await Date().convert(ctx, "08/03/2025-12:00")
+
+    assert converted == _utc(2025, 3, 8, 12, 0)
+
+
+@pytest.mark.asyncio
+async def test_next_date_converter_falls_back_to_utc_without_a_server_row(monkeypatch):
+    monkeypatch.setattr("juliabot.converters.Server.get", lambda server_id: None)
+    ctx = SimpleNamespace(guild=SimpleNamespace(id=10))
+
+    converted = await NextDate().convert(ctx, "h13", start=_utc(2025, 3, 8, 12, 0))
+
+    assert converted == _utc(2025, 3, 8, 13, 0)

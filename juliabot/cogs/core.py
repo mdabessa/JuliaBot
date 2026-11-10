@@ -57,7 +57,8 @@ class CoreCog(commands.Cog, name="core"):
         timezone = pytz.utc
         if ctx.guild:
             server = Server.get(ctx.guild.id)
-            timezone = server.get_timezone()
+            if server:
+                timezone = server.get_timezone()
 
         now = datetime.now().astimezone(timezone)
         now = now.strftime("%d/%m/%Y %H:%M")

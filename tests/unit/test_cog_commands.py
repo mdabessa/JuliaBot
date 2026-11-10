@@ -686,6 +686,14 @@ async def _run_core_current_time(
         "[UTC]" in ctx.reply_messages[-1].content
     ), "core::current_time should include the resolved timezone in the response"
 
+    monkeypatch.setattr(core_module.Server, "get", lambda guild_id: None)
+
+    await core_module.CoreCog.current_time.callback(cog, ctx)
+
+    assert (
+        "[UTC]" in ctx.reply_messages[-1].content
+    ), "core::current_time should fall back to UTC when the server is unknown"
+
 
 async def _run_core_say(monkeypatch: pytest.MonkeyPatch, _tmp_path: Path) -> None:
     bot, ctx = _make_ctx(content="!say ola")

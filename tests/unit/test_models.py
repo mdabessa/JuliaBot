@@ -53,6 +53,34 @@ def test_as_utc_keeps_utc_values_unchanged():
     assert converted.utcoffset() == datetime.timedelta(0)
 
 
+def test_server_timezone_falls_back_to_utc_when_unset(reminder_tables):
+    server = models.Server.get_or_create(GUILD_ID)
+    server.timezone = None
+
+    assert server.get_timezone() is pytz.utc
+
+
+def test_server_timezone_falls_back_to_utc_for_an_unknown_name(reminder_tables):
+    server = models.Server.get_or_create(GUILD_ID)
+    server.timezone = "Mars/Olympus_Mons"
+
+    assert server.get_timezone() is pytz.utc
+
+
+def test_server_timezone_returns_the_configured_zone(reminder_tables):
+    server = models.Server.get_or_create(GUILD_ID)
+    server.set_timezone(SAO_PAULO)
+
+    assert server.get_timezone() is SAO_PAULO
+
+
+def test_get_date_str_uses_utc_when_the_server_row_is_gone(reminder_tables):
+    reminder = _make_reminder(datetime.datetime(2025, 3, 8, 12, 0, tzinfo=pytz.utc))
+    models.Server.delete_all()
+
+    assert reminder.get_date_str() == "08/03/2025 12:00 [UTC]"
+
+
 def test_get_date_str_reads_stored_naive_times_as_utc(reminder_tables):
     server = models.Server.get_or_create(GUILD_ID)
     server.set_timezone(SAO_PAULO)

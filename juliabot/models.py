@@ -234,9 +234,22 @@ class Server(Model):
         """Retrieve the server's configured timezone.
 
         Returns:
-            pytz.timezone: The associated timezone object.
+            pytz.timezone: The configured timezone, or UTC when the server has
+            none configured or stores a name pytz does not know.
         """
-        return pytz.timezone(self.timezone)
+        name = self.timezone
+        if not name:
+            return pytz.utc
+
+        try:
+            return pytz.timezone(name)
+        except pytz.UnknownTimeZoneError:
+            logger.warning(
+                "Server %s stores an unknown timezone %r; using UTC",
+                self.server_id,
+                name,
+            )
+            return pytz.utc
 
     @classmethod
     def get(cls, server_id: str) -> Server | None:

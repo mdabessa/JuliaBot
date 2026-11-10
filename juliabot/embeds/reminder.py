@@ -50,7 +50,8 @@ async def reminder_embed(reminder: Reminder, bot) -> Embed:
         timezone = pytz.utc
         if reminder.server_id:
             server = reminder.get_server()
-            timezone = server.get_timezone()
+            if server:
+                timezone = server.get_timezone()
 
         next_reminder = as_utc(next_reminder).astimezone(timezone)
         next_reminder = next_reminder.strftime("%d/%m/%Y %H:%M")

@@ -452,3 +452,72 @@ class CalendarClient:
             url = f"{self._config.url}{href}"
 
         return url if url.endswith("/") else f"{url}/"
+
+
+def reminder_uid(reminder) -> str:
+    """Return the stable calendar UID for a reminder row."""
+    return f"juliabot-reminder-{reminder.id}@juliabot"
+
+
+def reminder_summary(message) -> str:
+    """Build the event title from the message the reminder was created from.
+
+    ``Reminder`` stores no text, so the Discord message is the only source of
+    the wording (PLAN.md §1 #11). Only the first line is used, so a multiline
+    message stays a title.
+    """
+    content = (getattr(message, "content", "") or "").strip()
+    first_line = content.splitlines()[0].strip() if content else ""
+
+    return f"Lembrete: {first_line}"
+
+
+def reminder_description(message) -> str:
+    """Build the event body: where the reminder came from, plus its permalink."""
+    channel = getattr(message, "channel", None)
+    channel_name = getattr(channel, "name", None) or "desconhecido"
+    guild = getattr(message, "guild", None)
+    guild_id = getattr(guild, "id", None)
+    channel_id = getattr(channel, "id", None)
+    message_id = getattr(message, "id", None)
+
+    lines = [f"Criado por !rm em #{channel_name}"]
+    if guild_id is not None and channel_id is not None and message_id is not None:
+        lines.append(
+            f"https://discord.com/channels/{guild_id}/{channel_id}/{message_id}"
+        )
+
+    return "\n".join(lines)
+
+
+async def publish_reminder(
+    client: CalendarClient,
+    reminder,
+    message,
+    *,
+    stamp: datetime | None = None,
+) -> bool:
+    """Mirror one reminder row into the configured calendar.
+
+    Args:
+        client (CalendarClient): Transport that owns the calendar href.
+        reminder: The persisted ``Reminder``; its id names the UID and its
+            ``time_reminder`` is the event's instant.
+        message: The Discord message the reminder points at; supplies the
+            title and the permalink.
+        stamp (datetime, optional): ``DTSTAMP`` value. Defaults to now.
+
+    Returns:
+        bool: True when the calendar holds the event, False when the calendar
+        could not be resolved.
+    """
+    uid = reminder_uid(reminder)
+    ics = build_event(
+        uid=uid,
+        start=reminder.time_reminder,
+        summary=reminder_summary(message),
+        description=reminder_description(message),
+        stamp=stamp or datetime.now(timezone.utc),
+    )
+
+    return await client.put_event(uid, ics)

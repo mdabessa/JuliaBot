@@ -1,8 +1,146 @@
+import datetime
 from types import SimpleNamespace
 
+import pytest
+import pytz
 from sqlalchemy import Column, Integer, MetaData, String, Table
 
 import juliabot.models as models
+
+GUILD_ID = "10"
+CHANNEL_ID = "20"
+MESSAGE_ID = "1000"
+USER_ID = "30"
+SAO_PAULO = pytz.timezone("America/Sao_Paulo")
+
+
+@pytest.fixture
+def reminder_tables():
+    models.init_db()
+    for table in (models.Reminder, models.Server):
+        table.delete_all()
+    yield
+    models.rollback()
+    for table in (models.Reminder, models.Server):
+        table.delete_all()
+    models.rollback()
+
+
+def _make_reminder(time_reminder, date_command=None):
+    return models.Reminder(
+        GUILD_ID, CHANNEL_ID, MESSAGE_ID, USER_ID, time_reminder, date_command
+    )
+
+
+def test_as_utc_treats_naive_values_as_utc():
+    naive = datetime.datetime(2025, 3, 8, 12, 0)
+
+    assert models.as_utc(naive) == datetime.datetime(2025, 3, 8, 12, 0, tzinfo=pytz.utc)
+
+
+def test_as_utc_converts_aware_values_to_the_same_instant():
+    local = SAO_PAULO.localize(datetime.datetime(2025, 3, 8, 9, 0))
+
+    assert models.as_utc(local) == datetime.datetime(2025, 3, 8, 12, 0, tzinfo=pytz.utc)
+
+
+def test_as_utc_keeps_utc_values_unchanged():
+    aware = datetime.datetime(2025, 3, 8, 12, 0, tzinfo=pytz.utc)
+
+    converted = models.as_utc(aware)
+
+    assert converted == aware
+    assert converted.utcoffset() == datetime.timedelta(0)
+
+
+def test_server_timezone_falls_back_to_utc_when_unset(reminder_tables):
+    server = models.Server.get_or_create(GUILD_ID)
+    server.timezone = None
+
+    assert server.get_timezone() is pytz.utc
+
+
+def test_server_timezone_falls_back_to_utc_for_an_unknown_name(reminder_tables):
+    server = models.Server.get_or_create(GUILD_ID)
+    server.timezone = "Mars/Olympus_Mons"
+
+    assert server.get_timezone() is pytz.utc
+
+
+def test_server_timezone_returns_the_configured_zone(reminder_tables):
+    server = models.Server.get_or_create(GUILD_ID)
+    server.set_timezone(SAO_PAULO)
+
+    assert server.get_timezone() is SAO_PAULO
+
+
+def test_get_date_str_uses_utc_when_the_server_row_is_gone(reminder_tables):
+    reminder = _make_reminder(datetime.datetime(2025, 3, 8, 12, 0, tzinfo=pytz.utc))
+    models.Server.delete_all()
+
+    assert reminder.get_date_str() == "08/03/2025 12:00 [UTC]"
+
+
+def test_get_date_str_reads_stored_naive_times_as_utc(reminder_tables):
+    server = models.Server.get_or_create(GUILD_ID)
+    server.set_timezone(SAO_PAULO)
+
+    reminder = _make_reminder(datetime.datetime(2025, 3, 8, 12, 0, tzinfo=pytz.utc))
+    # SQLite drops the offset, so read-back values are naive UTC.
+    reminder.time_reminder = datetime.datetime(2025, 3, 8, 12, 0)
+
+    assert reminder.get_date_str() == "08/03/2025 09:00 [America/Sao_Paulo]"
+
+
+def test_get_created_str_reads_stored_naive_times_as_utc(reminder_tables):
+    server = models.Server.get_or_create(GUILD_ID)
+    server.set_timezone(SAO_PAULO)
+
+    reminder = _make_reminder(datetime.datetime(2025, 3, 8, 12, 0, tzinfo=pytz.utc))
+    reminder.time_created = datetime.datetime(2025, 3, 8, 12, 0)
+
+    assert reminder.get_created_str() == "08/03/2025 09:00 [America/Sao_Paulo]"
+
+
+def test_reminder_time_round_trips_as_the_same_instant(reminder_tables):
+    expected = datetime.datetime(2025, 3, 8, 12, 0, tzinfo=pytz.utc)
+    reminder = _make_reminder(expected)
+
+    fresh = models.Session()
+    try:
+        stored = fresh.query(models.Reminder).filter_by(id=reminder.id).one()
+        stored_value = stored.time_reminder
+    finally:
+        fresh.close()
+
+    assert models.as_utc(stored_value) == expected
+
+
+def _freeze_clock(monkeypatch, frozen: datetime.datetime):
+    monkeypatch.setattr(models, "datetime", SimpleNamespace(now=lambda tz=None: frozen))
+
+
+def test_get_expired_compares_against_an_explicit_utc_now(monkeypatch, reminder_tables):
+    now = datetime.datetime(2025, 3, 8, 12, 0, tzinfo=pytz.utc)
+    _freeze_clock(monkeypatch, now)
+    server = models.Server.get_or_create(GUILD_ID)
+    server.set_timezone(SAO_PAULO)
+
+    past = _make_reminder(now - datetime.timedelta(minutes=1))
+    current_minute = _make_reminder(now.replace(second=0, microsecond=0))
+    future = _make_reminder(now + datetime.timedelta(minutes=1))
+
+    expired = {reminder.id for reminder in models.Reminder.get_expired()}
+
+    assert expired == {past.id, current_minute.id}
+    assert future.id not in expired
+
+
+def test_reminder_time_columns_are_timezone_aware():
+    table = models.Reminder.__table__
+
+    assert table.c.time_reminder.type.timezone is True
+    assert table.c.time_created.type.timezone is True
 
 
 def test_is_simple_auto_add_column_allows_basic_nullable_column():

@@ -89,7 +89,8 @@ class Date(commands.Converter):
         if ctx:
             if ctx.guild:
                 server = Server.get(ctx.guild.id)
-                timezone = server.get_timezone()
+                if server:
+                    timezone = server.get_timezone()
 
         date = None
         for f in formats:
@@ -216,7 +217,8 @@ class NextDate(commands.Converter):
         if ctx:
             if ctx.guild:
                 server = Server.get(ctx.guild.id)
-                timezone = server.get_timezone()
+                if server:
+                    timezone = server.get_timezone()
 
         start = start.astimezone(timezone)
         date = start

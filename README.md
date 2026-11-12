@@ -7,6 +7,7 @@ JuliaBot is a Discord bot written in Python using the [discord.py](https://githu
 - New animes episodes notification based on web scraping from multiple anime streaming sites
 - Subscribing to anime series to receive notifications
 - Reminder system for setting reminders
+- One-shot reminders mirrored into an existing Nextcloud calendar (opt-in)
 - Translation command
 - Interactive session framework: button pagination, prompts, and per-channel message rules
 
@@ -21,7 +22,7 @@ JuliaBot is a Discord bot written in Python using the [discord.py](https://githu
     - `ANIME_SCRAP_TIME`: The time in seconds between each web scraping for new anime episodes. Defaults to `3600`
     - `BOT_JIKAN_RATE_LIMIT`: The rate limit per minute for the Jikan API to the bot. Defaults to `50`
     - `SCRAP_JIKAN_RATE_LIMIT`: The rate limit per minute for the Jikan API to the web scraper. Defaults to `10`
-    - `NEXTCLOUD_URL`, `NEXTCLOUD_USER`, `NEXTCLOUD_APP_PASSWORD`, `NEXTCLOUD_CALENDAR`, `REMINDER_CALENDAR_USER_ID`: mirror one-shot reminders into an existing Nextcloud calendar. The mirror stays off unless all of them are set
+    - `NEXTCLOUD_URL`, `NEXTCLOUD_USER`, `NEXTCLOUD_APP_PASSWORD`, `NEXTCLOUD_CALENDAR`, `REMINDER_CALENDAR_USER_ID`: mirror one-shot reminders into an existing Nextcloud calendar. The mirror stays off unless all of them are set — see [Nextcloud reminder mirror](#nextcloud-reminder-mirror)
 5. Run the bot using `python -m juliabot`
 
 ## Commands
@@ -93,6 +94,43 @@ Multi-step interactions (pagination, confirmations, durable channel rules) are b
 `juliabot/sessions/`. Adding a new dialogue means declaring a session class, a `Registration`, and a
 JSON-safe payload; buttons, ownership, expiry, and restart restoration are handled by the framework.
 See [juliabot/sessions/README.md](juliabot/sessions/README.md).
+
+## Nextcloud reminder mirror
+Every one-shot reminder (`!rm`) created by one configured Discord user also creates a single event in
+an **existing** Nextcloud calendar, so the reminder shows up on every device that syncs with
+Nextcloud. Discord stays the only place a reminder is created, delivered and removed: the calendar is
+never read back.
+
+The mirror is **off unless configured**. Set all five variables in `.env`:
+
+| Variable | Meaning |
+| --- | --- |
+| `NEXTCLOUD_URL` | Base URL of the instance, e.g. `https://cloud.example.com` |
+| `NEXTCLOUD_USER` | Nextcloud login name |
+| `NEXTCLOUD_APP_PASSWORD` | App password, **not** the account password |
+| `NEXTCLOUD_CALENDAR` | Display name of a calendar that already exists, e.g. `Lembretes` |
+| `REMINDER_CALENDAR_USER_ID` | Discord user id whose one-shot reminders are mirrored |
+
+To create the app password, open Nextcloud → *Settings* → *Security* → *Devices & sessions* and add a
+new app password. It works with two-factor authentication and can be revoked on its own; the bot never
+logs it. Unsetting any of the five variables disables the mirror again.
+
+What the event looks like:
+
+- one `VEVENT` per reminder, `UID` = `juliabot-reminder-<row id>@juliabot`, so re-publishing the same
+  reminder is a no-op (`PUT` with `If-None-Match: *`) instead of a duplicate;
+- zero length: `DTSTART` is the reminder instant in UTC and there is no `DTEND`, so it does not block
+  time as a meeting would;
+- no `VALARM`, so the calendar's own default reminder settings apply (phone and Nextcloud may notify
+  in addition to the Discord message);
+- `SUMMARY` is the message that created the reminder, prefixed with `Lembrete: `; `DESCRIPTION`
+  carries the channel name and a `discord.com/channels/...` permalink back to the conversation.
+
+Deliberate limits: nothing removes or updates an event (deleting a reminder leaves its event alone),
+recurring reminders (`!rml`) are not mirrored, and the mirror is best effort — Nextcloud being slow,
+unreachable or rejecting the write never breaks `!rm`. Failures are logged as
+`Could not mirror reminder <id> to Nextcloud`; an unknown or duplicated calendar name logs the
+available names and disables the mirror rather than guessing.
 
 ## Database schema updates
 The schema is managed by versioned, reversible migrations in `juliabot/migrations/versions/`. Each

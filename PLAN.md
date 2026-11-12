@@ -8,7 +8,9 @@ Nextcloud. The calendar never writes back: Discord stays the only place a
 reminder is created, delivered and removed. Forgetting to implement "remove" is
 deliberate — the UID convention below keeps that door open at zero cost.
 
-Status: **plan only — no implementation started.**
+Status: **implemented on `epic/nextcloud-reminder-sync`** (steps 2–5). The prerequisite
+`fix/reminder-utc` (PR #13) must land in `main` before the epic merges, and `main` must then be
+merged into the epic.
 
 ---
 

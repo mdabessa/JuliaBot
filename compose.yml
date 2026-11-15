@@ -1,5 +1,7 @@
 # Single-host deployment: the bot and its Postgres in one Compose project.
-# Neither service publishes a port; the bot only makes outbound connections.
+# The bot publishes no ports (outbound connections only). Postgres is published
+# on loopback only, so host-side pg_dump/psql can handle backups and restores;
+# 5432 is already taken by the system Postgres on this host.
 #
 # Required in .env (see .env.example): DISCORD_TOKEN, POSTGRES_PASSWORD.
 
@@ -42,6 +44,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-juliabot}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
     shm_size: 256mb
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]

@@ -5,13 +5,12 @@ It detects if an instance is already running and starts the bot accordingly.
 """
 
 import argparse
-import datetime
 import logging
 
 from .client import Client
 from .config import DISCORD_TOKEN, TEST_MODE, setup_logging
 from .models import BotConfig, init_db
-from .utils import get_prefix
+from .utils import get_heartbeat_age, get_prefix, write_heartbeat
 
 logger = logging.getLogger(__name__)
 
@@ -31,16 +30,13 @@ init_db()
 
 
 if not args.force:
-    heartbeat = BotConfig.get("heartbeat")
-    now = datetime.datetime.now()
+    heartbeat_age = get_heartbeat_age()
 
-    if heartbeat is None:
-        BotConfig("heartbeat", now.strftime("%d/%m/%Y %H:%M:%S"))
-    else:
-        date = datetime.datetime.strptime(heartbeat.value, "%d/%m/%Y %H:%M:%S")
-        if (now - date).seconds < 60 * 5:
-            logger.warning("Bot já esta ativo!")
-            exit(0)
+    if heartbeat_age is None:
+        write_heartbeat()
+    elif heartbeat_age < 60 * 5:
+        logger.warning("Bot já esta ativo!")
+        exit(0)
 
 
 error = None

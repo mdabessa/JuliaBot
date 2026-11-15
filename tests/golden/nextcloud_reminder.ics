@@ -1,0 +1,11 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//JuliaBot//reminder//EN
+BEGIN:VEVENT
+UID:juliabot-reminder-42@juliabot
+DTSTAMP:20261109T120000Z
+DTSTART:20261109T150000Z
+SUMMARY:Lembrete: pagar aluguel
+DESCRIPTION:Criado por !rm em #geral\nhttps://discord.com/channels/1/2/3
+END:VEVENT
+END:VCALENDAR

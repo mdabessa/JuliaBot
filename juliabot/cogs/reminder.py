@@ -1,17 +1,24 @@
 """Reminder and scheduling cog.
 
 Provides commands to create, list, and manage reminders with recurrence
-support using Discord reactions.
+support using Discord reactions. One-shot reminders created by the configured
+owner are also mirrored into a Nextcloud calendar (see ``juliabot.nextcloud``).
 """
 
+from __future__ import annotations
+
+import asyncio
+import logging
 from typing import Union
 
+import aiohttp
 from discord.ext import commands, tasks
 
 from ..client import Client
 from ..converters import Date, DeltaToDate, NextDate
 from ..embeds.reminder import reminder_embed
 from ..models import Reminder
+from ..nextcloud import CalendarClient, NextcloudConfig, publish_reminder
 from ..sessions import (
     Action,
     InteractionEvent,
@@ -24,6 +31,8 @@ from ..sessions import (
 from ..sessions.patterns import PaginationSession
 
 LIST_REMINDERS = "reminder.list"
+
+logger = logging.getLogger(__name__)
 
 
 class ReminderPagination(PaginationSession[Reminder]):
@@ -84,8 +93,14 @@ class _ReminderCog(commands.Cog, name="reminder"):
 
     embed_title = ":alarm_clock:Reminder."
 
+    #: Seconds allowed for one mirrored reminder before it is abandoned.
+    mirror_timeout = 5.0
+
     def __init__(self, bot: Client) -> None:
         self.bot = bot
+        self.calendar_config = NextcloudConfig.from_env()
+        self._calendar_session: aiohttp.ClientSession | None = None
+        self._mirror_tasks: set[asyncio.Task] = set()
         if not hasattr(bot, "sessions"):
             bot.sessions = SessionManager(Registry())
         if bot.sessions.registry.get(LIST_REMINDERS) is None:
@@ -104,6 +119,64 @@ class _ReminderCog(commands.Cog, name="reminder"):
     @commands.Cog.listener()
     async def on_ready(self):
         self.reminder.start()
+
+    def _mirrors(self, reminder: Reminder) -> bool:
+        """Return whether this reminder should be copied to the calendar."""
+        config = self.calendar_config
+        if config is None:
+            return False
+
+        return str(reminder.user_id) == config.reminder_user_id
+
+    def _schedule_mirror(self, reminder: Reminder, message) -> None:
+        """Publish the reminder in the background, never blocking the reply."""
+        if not self._mirrors(reminder):
+            return
+
+        task = asyncio.create_task(self._mirror_reminder(reminder, message))
+        self._mirror_tasks.add(task)
+        task.add_done_callback(self._mirror_tasks.discard)
+
+    async def _mirror_reminder(self, reminder: Reminder, message) -> None:
+        """Send one reminder to the calendar, swallowing and logging failures."""
+        try:
+            await asyncio.wait_for(
+                self._publish_reminder(reminder, message),
+                timeout=self.mirror_timeout,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.warning(
+                "Could not mirror reminder %s to Nextcloud",
+                reminder.id,
+                exc_info=True,
+            )
+
+    async def _publish_reminder(self, reminder: Reminder, message) -> None:
+        """Build the client for one reminder; replaced by fakes in tests."""
+        session = await self._get_calendar_session()
+        client = CalendarClient(
+            session, self.calendar_config, timeout=self.mirror_timeout
+        )
+
+        await publish_reminder(client, reminder, message)
+
+    async def _get_calendar_session(self) -> aiohttp.ClientSession:
+        if self._calendar_session is None or self._calendar_session.closed:
+            self._calendar_session = aiohttp.ClientSession()
+
+        return self._calendar_session
+
+    def cog_unload(self):
+        asyncio.create_task(self._close_calendar_session())
+
+    async def _close_calendar_session(self) -> None:
+        session = self._calendar_session
+        self._calendar_session = None
+
+        if session is not None and not session.closed:
+            await session.close()
 
     @commands.command(
         brief="Mostra todos os seus lembretes!",
@@ -135,6 +208,7 @@ class _ReminderCog(commands.Cog, name="reminder"):
         reminder = Reminder(
             ctx.guild.id, ctx.channel.id, ctx.message.id, ctx.author.id, date
         )
+        self._schedule_mirror(reminder, ctx.message)
         await ctx.reply(f"OK, Eu irei te notificar no dia `{reminder.get_date_str()}`!")
 
     @commands.command(

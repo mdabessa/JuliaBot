@@ -54,12 +54,7 @@ try:
     SCRAP_JIKAN_RATE_LIMIT = int(environ["SCRAP_JIKAN_RATE_LIMIT"])
 except KeyError:
     SCRAP_JIKAN_RATE_LIMIT = 10
-
-try:
-    HEROKU_API_TOKEN = environ["HEROKU_API_TOKEN"]
-except KeyError:
-    HEROKU_API_TOKEN = None
-
+ 
 try:
     DEEPSEEK_API_KEY = environ["DEEPSEEK_API_KEY"]
 except KeyError:

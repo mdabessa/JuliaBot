@@ -1,1 +1,0 @@
-juliabot: python -m juliabot

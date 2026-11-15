@@ -1,4 +1,5 @@
 import datetime
+import signal
 from types import SimpleNamespace
 
 import pytest
@@ -55,6 +56,12 @@ def test_parse_heartbeat_reads_the_legacy_wall_clock_as_utc():
 @pytest.mark.parametrize("value", ["", None, "not a timestamp"])
 def test_parse_heartbeat_rejects_unreadable_values(value):
     assert utils.parse_heartbeat(value) is None
+
+
+def test_interrupt_on_sigterm_raises_keyboard_interrupt():
+    """SIGTERM must unwind through the same path as Ctrl-C."""
+    with pytest.raises(KeyboardInterrupt):
+        utils.interrupt_on_sigterm(signal.SIGTERM, None)
 
 
 def test_write_heartbeat_stores_an_iso_8601_utc_value(heartbeat_rows):

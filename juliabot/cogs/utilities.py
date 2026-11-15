@@ -5,6 +5,8 @@ export.
 """
 
 import os
+import shutil
+import tempfile
 
 from deep_translator import GoogleTranslator
 from discord import File
@@ -73,24 +75,27 @@ class UtilitiesCog(commands.Cog):
 
         msg = await ctx.send(f"Buscando histórico de mensagens de {channel.mention}...")
 
-        fp = "channel_history.txt"
+        workdir = tempfile.mkdtemp(prefix="juliabot-history-")
+        fp = os.path.join(workdir, "channel_history.txt")
         c = 0
-        with open(fp, "w", encoding="utf-8") as f:
-            async for message in channel.history(
-                limit=None, oldest_first=True, after=start, before=end
-            ):
-                text = f"{message.created_at} {message.guild.name}[{message.channel.name}] {message.author}: {message.content}\n"
-                f.write(text)
-                c += 1
+        try:
+            with open(fp, "w", encoding="utf-8") as f:
+                async for message in channel.history(
+                    limit=None, oldest_first=True, after=start, before=end
+                ):
+                    text = f"{message.created_at} {message.guild.name}[{message.channel.name}] {message.author}: {message.content}\n"
+                    f.write(text)
+                    c += 1
 
-                if c % 10000 == 0:
-                    await msg.edit(
-                        content=f"Buscando histórico de mensagens de {channel.mention}... ({c} mensagens) | em [{message.created_at}]"
-                    )
+                    if c % 10000 == 0:
+                        await msg.edit(
+                            content=f"Buscando histórico de mensagens de {channel.mention}... ({c} mensagens) | em [{message.created_at}]"
+                        )
 
-        await msg.delete()
-        await ctx.send("Histórico de mensagens:", file=File(fp))
-        os.remove(fp)
+            await msg.delete()
+            await ctx.send("Histórico de mensagens:", file=File(fp))
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
 
 
 async def setup(bot: Client):

@@ -1,0 +1,123 @@
+name: Deploy
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to redeploy, e.g. sha-1a2b3c4. Leave empty to deploy the current main."
+        required: false
+        type: string
+
+# Never let two deployments overlap: the VPS runs a single bot instance and a
+# second instance would answer commands alongside the first.
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/mdabessa/juliabot
+
+jobs:
+  ci:
+    name: Tests
+    permissions:
+      contents: read
+    uses: ./.github/workflows/tests.yml
+
+  build:
+    name: Build arm64 image
+    needs: ci
+    if: github.event_name == 'push'
+    # Native arm64, free for public repositories. No QEMU, so the build matches
+    # the VPS architecture exactly.
+    runs-on: ubuntu-24.04-arm
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Derive image tag
+        id: meta
+        run: echo "tag=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Builds natively on the arm64 runner, so the target architecture needs no
+      # emulation and the image is byte-identical to what the VPS runs.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to VPS
+    needs: [ci, build]
+    if: >-
+      !cancelled()
+      && needs.ci.result == 'success'
+      && needs.build.result != 'failure'
+      && needs.build.result != 'cancelled'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ github.event.inputs.tag || needs.build.outputs.tag }}
+    steps:
+      - name: Validate tag
+        run: |
+          if ! [[ "$TAG" =~ ^(latest|sha-[0-9a-f]{7})$ ]]; then
+            echo "::error::Expected an image tag like sha-1a2b3c4, got '${TAG}'"
+            exit 1
+          fi
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      # The host key is pinned rather than discovered, and the key is restricted
+      # in authorized_keys to the juliabot-deploy forced command.
+      - name: Deploy
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -p "${{ vars.DEPLOY_PORT || '22' }}" \
+              -o IdentitiesOnly=yes \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -o ConnectTimeout=15 \
+              "${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}" \
+              "juliabot-deploy $TAG"
+
+      - name: Summarize
+        if: success()
+        run: |
+          echo "Deployed \`$TAG\` to \`${{ vars.DEPLOY_HOST }}\`." >> "$GITHUB_STEP_SUMMARY"

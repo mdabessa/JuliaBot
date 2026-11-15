@@ -161,3 +161,7 @@ cython_debug/
 #.idea/
 
 *.env
+
+# Deployment state written on the VPS by scripts/deploy_vps.sh
+/.deployed_tag
+/.deploy.lock

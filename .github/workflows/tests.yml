@@ -1,10 +1,11 @@
 name: CI
 
 on:
-  push:
-    branches: ["main", "refactor/session-framework"]
   pull_request:
     branches: ["main", "refactor/session-framework"]
+  # Also called as the test gate of the deploy pipeline, so a pushed commit to
+  # main is tested once, by the run that gates its deployment.
+  workflow_call:
 
 jobs:
   formatting:

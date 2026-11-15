@@ -25,8 +25,9 @@ JuliaBot is a Discord bot written in Python using the [discord.py](https://githu
 
 ### Running with Docker
 The repository ships a `Dockerfile` and a Compose project that runs the bot and a
-PostgreSQL 16 instance together. Neither service publishes a port: the bot only
-makes outbound connections.
+PostgreSQL 16 instance together. The bot publishes no ports and only makes
+outbound connections; Postgres is published on `127.0.0.1:5433` only, so host
+side `pg_dump` and `psql` can reach it for backups and restores.
 
 ```bash
 cp .env.example .env      # fill in DISCORD_TOKEN and POSTGRES_PASSWORD
@@ -44,6 +45,89 @@ migrations on startup. The migration CLI runs through the container:
 ```bash
 docker compose run --rm juliabot python -m juliabot.migrations status
 ```
+
+## Deployment
+Every push to `main` deploys to the VPS. The pipeline is
+[.github/workflows/deploy.yml](.github/workflows/deploy.yml):
+
+1. **Tests** — the same suite as CI, via a reusable call to `tests.yml`. A failing
+   test stops the pipeline before anything is built or deployed.
+2. **Build** — a native `linux/arm64` image on GitHub's arm runner (no emulation),
+   pushed to GHCR as `sha-<7>` plus `latest`.
+3. **Deploy** — SSH to the VPS and run `juliabot-deploy <tag>`, which syncs the
+   checkout to `origin/main`, pulls the image, applies migrations, recreates the
+   bot container, and waits for the bot's own `Pronto!` log line.
+
+A deploy is considered successful only when the bot reports itself ready. If it
+does not, the script rolls back to the previous tag automatically and exits
+non-zero, so the run goes red but production stays up. Rolling back assumes an
+expand-only schema, which is what this repository uses; after a destructive
+migration, deploy with `AUTO_ROLLBACK=0` and restore from a backup instead.
+
+Deployments are serialised by a `concurrency` group and by a `flock` on the host,
+because a second bot instance would answer commands alongside the first.
+
+### Repository settings
+Create these once under **Settings → Secrets and variables → Actions**:
+
+| Kind | Name | Value |
+| --- | --- | --- |
+| Variable | `DEPLOY_HOST` | VPS hostname or IP |
+| Variable | `DEPLOY_USER` | User owning the checkout and in the `docker` group, e.g. `ubuntu` |
+| Variable | `DEPLOY_PORT` | SSH port, defaults to `22` |
+| Secret | `DEPLOY_SSH_KEY` | Private half of the deploy keypair |
+| Secret | `DEPLOY_KNOWN_HOSTS` | Output of `ssh-keyscan -p PORT HOST` |
+
+The `environment: production` on the deploy job also makes it possible to add
+required reviewers later without touching the workflow.
+
+### One-time VPS setup
+The deploy script takes no defaults for the project directory. Point it at the
+existing checkout with `/etc/default/juliabot-deploy`:
+
+```bash
+echo 'APP_DIR=/home/ubuntu/JuliaBot' | sudo tee /etc/default/juliabot-deploy
+sudo chmod 644 /etc/default/juliabot-deploy
+sudo install -o root -g root -m 755 \
+  /home/ubuntu/JuliaBot/scripts/deploy_vps.sh /usr/local/bin/juliabot-deploy
+```
+
+The directory must be a checkout of this repository — `deploy_vps.sh` syncs it to
+`origin/main` on every deploy, so `compose.yml` cannot drift from the repo. `.env`
+sits beside `compose.yml`, is untracked, and is preserved by the sync. Confirm it
+is a checkout, and that the remote is right:
+
+```bash
+git -C /home/ubuntu/JuliaBot remote -v
+git -C /home/ubuntu/JuliaBot status --short
+```
+
+Then add the deploy public key to the deploy user's
+`~/.ssh/authorized_keys`, prefixed with
+`restrict,command="/usr/local/bin/juliabot-deploy"`. That prefix is what makes
+the key harmless if it leaks: the user it belongs to cannot run anything else,
+so the script must be readable by that user but not writable by them.
+
+The same user needs Docker access and must own the checkout. Reusing the existing
+`ubuntu` account satisfies both; a dedicated user is stronger but then
+`/home/ubuntu` (often mode `750`) has to be traversable, and the checkout
+re-owned. If the GHCR package is private, that user also logs in once:
+
+```bash
+echo "$PAT" | docker login ghcr.io -u mdabessa --password-stdin
+```
+
+where `PAT` is a token with only `read:packages`.
+
+### Rolling back
+Re-run the workflow from **Actions → Deploy → Run workflow** with the tag of a
+previous build, or on the host:
+
+```bash
+sudo -u deploy juliabot-deploy sha-1a2b3c4
+```
+
+`$APP_DIR/.deployed_tag` records the tag currently live on the host.
 
 ## Commands
 The help command can be used to get a list of all commands and can be passed a command name to get more information about a specific command. The prefix can be changed using the `prefix` command.

@@ -1,0 +1,32 @@
+# Secrets and local state: never ship these in an image layer.
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.gitattributes
+.venv
+venv
+
+# Local and test artifacts
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.db
+test.ipynb
+.ipynb_checkpoints/
+
+# Not needed at runtime
+.github/
+tests/
+scripts/
+requirements-dev.txt
+pytest.ini
+.pre-commit-config.yaml
+Procfile
+*.md
+LICENSE

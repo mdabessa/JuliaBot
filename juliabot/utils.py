@@ -21,6 +21,23 @@ HEARTBEAT_KEY = "heartbeat"
 LEGACY_HEARTBEAT_FORMAT = "%d/%m/%Y %H:%M:%S"
 
 
+def interrupt_on_sigterm(signum, frame) -> None:
+    """Raise ``KeyboardInterrupt`` so SIGTERM unwinds like Ctrl-C.
+
+    ``docker stop`` and every process supervisor send SIGTERM. Python's default
+    action terminates the process immediately, so the ``finally`` block that
+    deletes the heartbeat row never runs, and the next start within five
+    minutes aborts with "Bot já esta ativo!". discord.py already handles
+    ``KeyboardInterrupt`` inside ``Client.run`` by closing the connection, so
+    reusing that path is all that is needed.
+
+    Args:
+        signum: Signal number passed by the interpreter.
+        frame: Current stack frame passed by the interpreter.
+    """
+    raise KeyboardInterrupt
+
+
 def get_prefix(bot: Bot, message: Message) -> str:
     """Resolve the command prefix for a message.
 

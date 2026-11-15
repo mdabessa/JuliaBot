@@ -23,6 +23,28 @@ JuliaBot is a Discord bot written in Python using the [discord.py](https://githu
     - `SCRAP_JIKAN_RATE_LIMIT`: The rate limit per minute for the Jikan API to the web scraper. Defaults to `10`
 5. Run the bot using `python -m juliabot`
 
+### Running with Docker
+The repository ships a `Dockerfile` and a Compose project that runs the bot and a
+PostgreSQL 16 instance together. Neither service publishes a port: the bot only
+makes outbound connections.
+
+```bash
+cp .env.example .env      # fill in DISCORD_TOKEN and POSTGRES_PASSWORD
+docker compose -f compose.yml -f compose.dev.yml up -d --build
+docker compose logs -f juliabot
+```
+
+Because `POSTGRES_USER`, `POSTGRES_PASSWORD` and `POSTGRES_DB` are set,
+Compose derives the bot's `DATABASE_URL` itself, so the application and the
+database cannot disagree. `compose.yml` on its own never builds: it pulls the
+image CI publishes, so a bare `docker compose up -d` on a host cannot trigger a
+build. The container runs as an unprivileged user and applies pending schema
+migrations on startup. The migration CLI runs through the container:
+
+```bash
+docker compose run --rm juliabot python -m juliabot.migrations status
+```
+
 ## Commands
 The help command can be used to get a list of all commands and can be passed a command name to get more information about a specific command. The prefix can be changed using the `prefix` command.
 

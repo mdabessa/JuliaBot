@@ -1,0 +1,61 @@
+# Single-host deployment: the bot and its Postgres in one Compose project.
+# The bot publishes no ports (outbound connections only). Postgres is published
+# on loopback only, so host-side pg_dump/psql can handle backups and restores;
+# 5432 is already taken by the system Postgres on this host.
+#
+# Required in .env (see .env.example): DISCORD_TOKEN, POSTGRES_PASSWORD.
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  juliabot:
+    image: ghcr.io/mdabessa/juliabot:${JULIABOT_TAG:-latest}
+    # Override to point at another env file without touching .env.
+    env_file:
+      - ${JULIABOT_ENV_FILE:-.env}
+    environment:
+      # Built here so the compose Postgres and the bot cannot disagree.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-juliabot}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-juliabot}
+      GITHUB_REPOSITORY: ${GITHUB_REPOSITORY:-mdabessa/JuliaBot}
+      TZ: ${TZ:-UTC}
+    depends_on:
+      db:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+    # The bot deletes its heartbeat row on SIGTERM; let it finish.
+    stop_grace_period: 60s
+    # Keeps a runaway channel export from taking the host's other workloads down.
+    mem_limit: 768m
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-juliabot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-juliabot}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5433:5432"
+    shm_size: 256mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    logging: *default-logging
+
+volumes:
+  pgdata:

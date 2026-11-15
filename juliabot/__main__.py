@@ -6,11 +6,12 @@ It detects if an instance is already running and starts the bot accordingly.
 
 import argparse
 import logging
+import signal
 
 from .client import Client
 from .config import DISCORD_TOKEN, TEST_MODE, setup_logging
 from .models import BotConfig, init_db
-from .utils import get_heartbeat_age, get_prefix, write_heartbeat
+from .utils import get_heartbeat_age, get_prefix, interrupt_on_sigterm, write_heartbeat
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,9 @@ if not args.force:
 
 error = None
 try:
+    # docker stop sends SIGTERM; without this the process dies before the
+    # finally block below can delete the heartbeat row.
+    signal.signal(signal.SIGTERM, interrupt_on_sigterm)
     bot = Client(command_prefix=get_prefix, help_command=None, test_mode=TEST_MODE)
     bot.run(DISCORD_TOKEN)
 except Exception as e:

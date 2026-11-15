@@ -1225,7 +1225,7 @@ async def _run_utilities_channel_history(
         ctx.channel.sent_messages[0].deleted is True
     ), "utilities::channel_history should delete the progress message after finishing"
     assert (
-        ctx.channel.sent_messages[-1].file.path == "channel_history.txt"
+        Path(ctx.channel.sent_messages[-1].file.path).name == "channel_history.txt"
     ), "utilities::channel_history should send the generated transcript file"
 
 

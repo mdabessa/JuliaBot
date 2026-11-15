@@ -1,0 +1,8 @@
+# Local development only. The production compose file never builds: the VPS
+# pulls the image CI published, so `up` on the host cannot trigger a build.
+#
+#   docker compose -f compose.yml -f compose.dev.yml up -d --build
+services:
+  juliabot:
+    build:
+      context: .

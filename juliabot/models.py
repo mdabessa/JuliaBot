@@ -42,6 +42,25 @@ logger = logging.getLogger(__name__)
 MIGRATION_MANAGED_TABLES = frozenset({"session"})
 
 
+def as_utc(value: datetime) -> datetime:
+    """Interpret a database timestamp as an absolute UTC instant.
+
+    PostgreSQL returns aware values for ``TIMESTAMP WITH TIME ZONE`` columns,
+    while SQLite and legacy data drop the offset and return naive ones. A naive
+    value is always UTC, never the host's local time.
+
+    Args:
+        value (datetime): Timestamp read from the database.
+
+    Returns:
+        datetime: The same instant as an aware UTC datetime.
+    """
+    if value.tzinfo is None:
+        return value.replace(tzinfo=pytz.utc)
+
+    return value.astimezone(pytz.utc)
+
+
 class Model(Base):
     """Abstract base model for all database entities.
 
@@ -215,9 +234,22 @@ class Server(Model):
         """Retrieve the server's configured timezone.
 
         Returns:
-            pytz.timezone: The associated timezone object.
+            pytz.timezone: The configured timezone, or UTC when the server has
+            none configured or stores a name pytz does not know.
         """
-        return pytz.timezone(self.timezone)
+        name = self.timezone
+        if not name:
+            return pytz.utc
+
+        try:
+            return pytz.timezone(name)
+        except pytz.UnknownTimeZoneError:
+            logger.warning(
+                "Server %s stores an unknown timezone %r; using UTC",
+                self.server_id,
+                name,
+            )
+            return pytz.utc
 
     @classmethod
     def get(cls, server_id: str) -> Server | None:
@@ -272,7 +304,7 @@ class Reminder(Model):
     message_id = Column(String, nullable=False)
     user_id = Column(String, nullable=False)
     time_created = Column(DateTime(timezone=True), server_default=func.now())
-    time_reminder = Column(DateTime, nullable=False)
+    time_reminder = Column(DateTime(timezone=True), nullable=False)
     date_command = Column(String, default=None)
 
     def __init__(
@@ -312,7 +344,7 @@ class Reminder(Model):
         if server:
             timezone = server.get_timezone()
 
-        date = self.time_reminder.astimezone(timezone)
+        date = as_utc(self.time_reminder).astimezone(timezone)
         date = date.strftime("%d/%m/%Y %H:%M")
 
         return date + f" [{timezone.zone}]"
@@ -328,7 +360,7 @@ class Reminder(Model):
         if server:
             timezone = server.get_timezone()
 
-        date = self.time_created.astimezone(timezone)
+        date = as_utc(self.time_created).astimezone(timezone)
         date = date.strftime("%d/%m/%Y %H:%M")
 
         return date + f" [{timezone.zone}]"
@@ -337,11 +369,14 @@ class Reminder(Model):
     def get_expired(cls) -> List[Reminder]:
         """Fetch all reminders past their trigger time.
 
+        Both sides of the comparison are absolute: ``now`` is aware UTC and the
+        query sends it as UTC, so the result never depends on the host or the
+        database session timezone.
+
         Returns:
             List[Reminder]: Expired reminders ready to be triggered.
         """
-        now = datetime.now()
-        now = now.astimezone(pytz.utc)
+        now = datetime.now(pytz.utc)
         now = now.replace(second=59, microsecond=999999)
         return session.query(cls).filter(cls.time_reminder <= now).all()
 

@@ -12,7 +12,8 @@ from discord import Message
 from discord.ext import commands, tasks
 
 from ..client import Client
-from ..models import BotConfig, Server
+from ..models import Server
+from ..utils import write_heartbeat
 
 
 class CoreCog(commands.Cog, name="core"):
@@ -57,7 +58,8 @@ class CoreCog(commands.Cog, name="core"):
         timezone = pytz.utc
         if ctx.guild:
             server = Server.get(ctx.guild.id)
-            timezone = server.get_timezone()
+            if server:
+                timezone = server.get_timezone()
 
         now = datetime.now().astimezone(timezone)
         now = now.strftime("%d/%m/%Y %H:%M")
@@ -95,14 +97,7 @@ class CoreCog(commands.Cog, name="core"):
 
     @tasks.loop(seconds=60)
     async def update_hearbeat(self):
-        now = datetime.now()
-
-        heartbeat = BotConfig.get("heartbeat")
-        if heartbeat is None:
-            BotConfig("heartbeat", now.strftime("%d/%m/%Y %H:%M:%S"))
-        else:
-            heartbeat.value = now.strftime("%d/%m/%Y %H:%M:%S")
-            heartbeat.update()
+        write_heartbeat()
 
 
 async def setup(bot: Client):
